@@ -1,0 +1,206 @@
+{
+  "name": "adalat360-network",
+  "version": "1.0.0",
+  "client": {
+    "organization": "OfficerMSP",
+    "connection": {
+      "timeout": {
+        "peer": {
+          "endorser": "300"
+        },
+        "orderer": "300"
+      }
+    }
+  },
+  "organizations": {
+    "OfficerMSP": {
+      "mspid": "OfficerMSP",
+      "peers": [
+        "peer0.officer.adalat360.gov.in"
+      ],
+      "certificateAuthorities": [
+        "ca.officer.adalat360.gov.in"
+      ],
+      "adminPrivateKey": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/officer.adalat360.gov.in/users/Admin@officer.adalat360.gov.in/msp/keystore/priv_sk"
+      },
+      "signedCert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/officer.adalat360.gov.in/users/Admin@officer.adalat360.gov.in/msp/signcerts/Admin@officer.adalat360.gov.in-cert.pem"
+      }
+    },
+    "ForensicLabMSP": {
+      "mspid": "ForensicLabMSP",
+      "peers": [
+        "peer0.forensic.adalat360.gov.in"
+      ],
+      "certificateAuthorities": [
+        "ca.forensic.adalat360.gov.in"
+      ],
+      "adminPrivateKey": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/forensic.adalat360.gov.in/users/Admin@forensic.adalat360.gov.in/msp/keystore/priv_sk"
+      },
+      "signedCert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/forensic.adalat360.gov.in/users/Admin@forensic.adalat360.gov.in/msp/signcerts/Admin@forensic.adalat360.gov.in-cert.pem"
+      }
+    },
+    "CourtMSP": {
+      "mspid": "CourtMSP",
+      "peers": [
+        "peer0.court.adalat360.gov.in"
+      ],
+      "certificateAuthorities": [
+        "ca.court.adalat360.gov.in"
+      ],
+      "adminPrivateKey": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/court.adalat360.gov.in/users/Admin@court.adalat360.gov.in/msp/keystore/priv_sk"
+      },
+      "signedCert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/court.adalat360.gov.in/users/Admin@court.adalat360.gov.in/msp/signcerts/Admin@court.adalat360.gov.in-cert.pem"
+      }
+    },
+    "AuditMSP": {
+      "mspid": "AuditMSP",
+      "peers": [
+        "peer0.audit.adalat360.gov.in"
+      ],
+      "certificateAuthorities": [
+        "ca.audit.adalat360.gov.in"
+      ],
+      "adminPrivateKey": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/audit.adalat360.gov.in/users/Admin@audit.adalat360.gov.in/msp/keystore/priv_sk"
+      },
+      "signedCert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/audit.adalat360.gov.in/users/Admin@audit.adalat360.gov.in/msp/signcerts/Admin@audit.adalat360.gov.in-cert.pem"
+      }
+    }
+  },
+  "peers": {
+    "peer0.officer.adalat360.gov.in": {
+      "url": "grpcs://localhost:7051",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/officer.adalat360.gov.in/peers/peer0.officer.adalat360.gov.in/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.officer.adalat360.gov.in",
+        "hostnameOverride": "peer0.officer.adalat360.gov.in"
+      }
+    },
+    "peer0.forensic.adalat360.gov.in": {
+      "url": "grpcs://localhost:8051",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/forensic.adalat360.gov.in/peers/peer0.forensic.adalat360.gov.in/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.forensic.adalat360.gov.in",
+        "hostnameOverride": "peer0.forensic.adalat360.gov.in"
+      }
+    },
+    "peer0.court.adalat360.gov.in": {
+      "url": "grpcs://localhost:9051",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/court.adalat360.gov.in/peers/peer0.court.adalat360.gov.in/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.court.adalat360.gov.in",
+        "hostnameOverride": "peer0.court.adalat360.gov.in"
+      }
+    },
+    "peer0.audit.adalat360.gov.in": {
+      "url": "grpcs://localhost:10051",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/audit.adalat360.gov.in/peers/peer0.audit.adalat360.gov.in/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "peer0.audit.adalat360.gov.in",
+        "hostnameOverride": "peer0.audit.adalat360.gov.in"
+      }
+    }
+  },
+  "certificateAuthorities": {
+    "ca.officer.adalat360.gov.in": {
+      "url": "https://localhost:7054",
+      "caName": "ca.officer.adalat360.gov.in",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/officer.adalat360.gov.in/ca/ca.officer.adalat360.gov.in-cert.pem"
+      },
+      "httpOptions": {
+        "verify": false
+      }
+    },
+    "ca.forensic.adalat360.gov.in": {
+      "url": "https://localhost:8054",
+      "caName": "ca.forensic.adalat360.gov.in",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/forensic.adalat360.gov.in/ca/ca.forensic.adalat360.gov.in-cert.pem"
+      },
+      "httpOptions": {
+        "verify": false
+      }
+    },
+    "ca.court.adalat360.gov.in": {
+      "url": "https://localhost:9054",
+      "caName": "ca.court.adalat360.gov.in",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/court.adalat360.gov.in/ca/ca.court.adalat360.gov.in-cert.pem"
+      },
+      "httpOptions": {
+        "verify": false
+      }
+    },
+    "ca.audit.adalat360.gov.in": {
+      "url": "https://localhost:10054",
+      "caName": "ca.audit.adalat360.gov.in",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/peerOrganizations/audit.adalat360.gov.in/ca/ca.audit.adalat360.gov.in-cert.pem"
+      },
+      "httpOptions": {
+        "verify": false
+      }
+    }
+  },
+  "orderers": {
+    "orderer0.adalat360.gov.in": {
+      "url": "grpcs://localhost:7050",
+      "tlsCACert": {
+        "path": "/fabric-config/crypto-config/ordererOrganizations/adalat360.gov.in/orderers/orderer0.adalat360.gov.in/tls/ca.crt"
+      },
+      "grpcOptions": {
+        "ssl-target-name-override": "orderer0.adalat360.gov.in",
+        "hostnameOverride": "orderer0.adalat360.gov.in"
+      }
+    }
+  },
+  "channels": {
+    "adalat360-channel": {
+      "orderers": [
+        "orderer0.adalat360.gov.in"
+      ],
+      "peers": {
+        "peer0.officer.adalat360.gov.in": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        },
+        "peer0.forensic.adalat360.gov.in": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        },
+        "peer0.court.adalat360.gov.in": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        },
+        "peer0.audit.adalat360.gov.in": {
+          "endorsingPeer": true,
+          "chaincodeQuery": true,
+          "ledgerQuery": true,
+          "eventSource": true
+        }
+      }
+    }
+  }
+}
