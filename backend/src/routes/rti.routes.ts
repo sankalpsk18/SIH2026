@@ -5,11 +5,11 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { pgQuery, pgTransaction } from '../config/database.js';
-import { authenticate, requireRole, requireCaseAccess, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { logAuditEvent } from '../services/audit.service.js';
-import { UserRole } from '../types/database.js';
+import { pgQuery, pgTransaction } from '@config/database.js';
+import { authenticate, requireRole, requireCaseAccess, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { UserRole } from '@types/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();

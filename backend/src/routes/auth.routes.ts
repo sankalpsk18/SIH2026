@@ -5,12 +5,12 @@
 
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { authService } from '../services/auth.service.js';
-import { authenticate, requireRole, requirePermission, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { authValidators } from '../validators/auth.validators.js';
-import { logAuditEvent } from '../services/audit.service.js';
-import { UserRole, PermissionLevel } from '../models/auth.js';
+import { authService } from '@services/auth.service.js';
+import { authenticate, requireRole, requirePermission, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { authValidators } from '@validators/auth.validators.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { UserRole, PermissionLevel } from '@models/auth.js';
 
 const router = Router();
 

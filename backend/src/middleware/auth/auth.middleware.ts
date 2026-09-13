@@ -4,11 +4,11 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { config } from '../../config/index.js';
-import { verifyAccessToken, extractTokenFromHeader, extractTokenFromCookie } from '../../utils/jwt.js';
-import { getSession, updateSessionActivity } from '../../services/session.service.js';
-import { logAuditEvent } from '../../services/audit.service.js';
-import { AccessTokenPayload, UserRole, PermissionLevel } from '../../models/auth.js';
+import { config } from '@config/index.js';
+import { verifyAccessToken, extractTokenFromHeader, extractTokenFromCookie } from '@utils/jwt.js';
+import { getSession, updateSessionActivity } from '@services/session.service.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { AccessTokenPayload, UserRole, PermissionLevel } from '@models/auth.js';
 
 // ============================================================================
 // EXTEND EXPRESS REQUEST

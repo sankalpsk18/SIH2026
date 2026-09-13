@@ -5,11 +5,11 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { getTimelineService } from '../intelligence/timeline/timeline.service.js';
-import { authenticate, requireCaseAccess, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { logAuditEvent } from '../services/audit.service.js';
-import { CustodyAction } from '../types/database.js';
+import { getTimelineService } from '@intelligence/timeline/timeline.service.js';
+import { authenticate, requireCaseAccess, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { CustodyAction } from '@types/database.js';
 
 const router = Router();
 

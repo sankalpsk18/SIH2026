@@ -5,10 +5,10 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { getEntityGraphService } from '../intelligence/entity-graph/entity-graph.service.js';
-import { authenticate, requireCaseAccess, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { logAuditEvent } from '../services/audit.service.js';
+import { getEntityGraphService } from '@intelligence/entity-graph/entity-graph.service.js';
+import { authenticate, requireCaseAccess, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { logAuditEvent } from '@services/audit.service.js';
 
 const router = Router();
 

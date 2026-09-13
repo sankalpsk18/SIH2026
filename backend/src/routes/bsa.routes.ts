@@ -5,11 +5,11 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { getBsaCertificateService } from '../intelligence/bsa-certificate/bsa-certificate.service.js';
-import { authenticate, requireRole, requireCaseAccess, requireCasePermission, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { logAuditEvent } from '../services/audit.service.js';
-import { UserRole, PermissionLevel } from '../types/database.js';
+import { getBsaCertificateService } from '@intelligence/bsa-certificate/bsa-certificate.service.js';
+import { authenticate, requireRole, requireCaseAccess, requireCasePermission, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { UserRole, PermissionLevel } from '@types/database.js';
 
 const router = Router();
 

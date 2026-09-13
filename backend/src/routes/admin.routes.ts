@@ -5,12 +5,12 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { pgQuery, pgTransaction } from '../config/database.js';
-import { getBlockchainService } from '../blockchain/blockchain.service.js';
-import { authenticate, requireRole, userRateLimit } from '../middleware/auth/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { logAuditEvent } from '../services/audit.service.js';
-import { UserRole, UserStatus, PermissionLevel } from '../types/database.js';
+import { pgQuery, pgTransaction } from '@config/database.js';
+import { getBlockchainService } from '@blockchain/blockchain.service.js';
+import { authenticate, requireRole, userRateLimit } from '@middleware/auth/auth.middleware.js';
+import { validate } from '@middleware/validate.middleware.js';
+import { logAuditEvent } from '@services/audit.service.js';
+import { UserRole, UserStatus, PermissionLevel } from '@types/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 
