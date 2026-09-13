@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: adalat360-postgres
+    environment:
+      POSTGRES_DB: adalat360
+      POSTGRES_USER: adalat360
+      POSTGRES_PASSWORD: adalat360_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations/postgresql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adalat360 -d adalat360"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adalat360-network
+
+  mongodb:
+    image: mongo:6-alpine
+    container_name: adalat360-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: adalat360
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./backend/migrations/mongodb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adalat360-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: adalat360-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adalat360-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: adalat360-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - adalat360-network
+
+  # Initialize MinIO bucket
+  minio-init:
+    image: minio/mc:latest
+    container_name: adalat360-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do echo 'Waiting for MinIO...'; sleep 2; done;
+      mc mb --ignore-existing local/adalat360-documents;
+      mc anonymous set public local/adalat360-documents;
+      echo 'MinIO bucket created';
+      "
+    networks:
+      - adalat360-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  minio_data:
+
+networks:
+  adalat360-network:
+    driver: bridge
