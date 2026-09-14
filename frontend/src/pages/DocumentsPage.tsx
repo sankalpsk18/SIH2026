@@ -72,12 +72,19 @@ export function DocumentsPage() {
   }, [page, limit, caseId]);
 
   const loadDocuments = async () => {
+    if (!selectedCaseId) {
+      // No case selected - show empty state
+      setDocuments([]);
+      setTotal(0);
+      setTotalPages(1);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const params = {
         page,
         limit,
-        caseId: selectedCaseId || undefined,
       };
       const response = await documentsApi.listByCase(selectedCaseId, params);
       setDocuments(response.data.documents);

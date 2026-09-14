@@ -52,25 +52,29 @@ export function DashboardPage() {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch data in parallel
-      const [casesRes, docsRes, eviRes, searchRes] = await Promise.allSettled([
-        casesApi.list({ limit: 5, sort_by: 'created_at', sort_order: 'desc' }),
-        documentsApi.listByCase('', { limit: 5, sort_by: 'created_at', sort_order: 'desc' }), // Will need caseId
-        evidenceApi.listByCase('', { limit: 5, sort_by: 'seized_at', sort_order: 'desc' }), // Will need caseId
-        searchApi.search({ query: '', page: 1, limit: 5 }),
-      ]);
+      // Fetch cases first
+      const casesRes = await casesApi.list({ limit: 5, sort_by: 'created_at', sort_order: 'desc' });
+      const cases = casesRes.data.cases || [];
+      setRecentCases(cases);
 
-      // Process cases
-      if (casesRes.status === 'fulfilled') {
-        const cases = casesRes.value.data.cases || [];
-        setRecentCases(cases);
+      // If we have cases, fetch documents and evidence for the first case
+      let docsRes: any = { status: 'rejected' };
+      let eviRes: any = { status: 'rejected' };
+      if (cases.length > 0) {
+        const firstCaseId = cases[0].id;
+        [docsRes, eviRes] = await Promise.allSettled([
+          documentsApi.listByCase(firstCaseId, { limit: 5, sort_by: 'created_at', sort_order: 'desc' }),
+          evidenceApi.listByCase(firstCaseId, { limit: 5, sort_by: 'seized_at', sort_order: 'desc' }),
+        ]);
       }
+
+      const searchRes = await searchApi.search({ query: '', page: 1, limit: 5 }).catch(() => ({ status: 'rejected' }));
 
       // Build stats
       const statCards: StatCard[] = [
         {
           title: 'Active Cases',
-          value: casesRes.status === 'fulfilled' ? casesRes.value.data.total || 0 : 0,
+          value: casesRes.data.total || 0,
           icon: <FolderKanban className="w-6 h-6" />,
           color: 'bg-blue-500',
           href: '/cases',

@@ -58,6 +58,10 @@ import {
     createDeviceFingerprint,
 } from '../utils/mfa.js';
 import {
+    generateBackupCodes,
+    hashBackupCodes,
+} from '../utils/password.js';
+import {
     createSession,
     getSession,
     updateSessionMfaVerified,

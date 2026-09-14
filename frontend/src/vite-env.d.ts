@@ -7,3 +7,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Add crypto to global for randomUUID
+declare global {
+  interface Window {
+    crypto: Crypto;
+  }
+}

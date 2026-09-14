@@ -78,12 +78,19 @@ export function EvidencePage() {
   }, [page, limit, caseId]);
 
   const loadEvidence = async () => {
+    if (!selectedCaseId) {
+      // No case selected - show empty state
+      setEvidence([]);
+      setTotal(0);
+      setTotalPages(1);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const params = {
         page,
         limit,
-        caseId: selectedCaseId || undefined,
       };
       const response = await evidenceApi.listByCase(selectedCaseId, params);
       setEvidence(response.data.evidence);
