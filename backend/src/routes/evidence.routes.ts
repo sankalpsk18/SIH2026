@@ -143,7 +143,10 @@ router.get('/case/:caseId',
     async (req, res, next) => {
         try {
             const { caseId } = req.params;
-            const { page, limit, evidence_type, status, current_custodian_id, forensic_lab_id, search } = req.query as any;
+            // Explicitly convert to numbers as safety measure
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 20;
+            const { evidence_type, status, current_custodian_id, forensic_lab_id, search } = req.query as any;
             const offset = (page - 1) * limit;
 
             const conditions: string[] = ['e.case_id = $1', 'e.deleted_at IS NULL'];

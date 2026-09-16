@@ -116,7 +116,6 @@ export class SearchService {
 
     private async keywordSearch(query: SearchQuery, accessibleCaseIds: string[]): Promise<{ results: SearchResult[]; total: number }> {
         const conditions: string[] = [
-            'si.deleted_at IS NULL',
             'si.case_id = ANY($1)',
         ];
         const params: any[] = [accessibleCaseIds];
@@ -186,9 +185,11 @@ export class SearchService {
         }
 
         const whereClause = conditions.join(' AND ');
-        const offset = (query.page - 1) * query.limit;
+        const page = Number(query.page) || 1;
+        const limit = Number(query.limit) || 20;
+        const offset = (page - 1) * limit;
 
-        params.push(query.limit, offset);
+        params.push(limit, offset);
 
         const [resultsResult, countResult] = await Promise.all([
             pgQuery(

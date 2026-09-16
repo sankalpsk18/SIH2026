@@ -181,6 +181,14 @@ export interface Document {
   uploaded_by_name?: string;
   created_at: string;
   updated_at: string;
+  stored_filename?: string;
+  encryption_algorithm?: string;
+  storage_path?: string;
+  storage_bucket?: string;
+  ocr_language?: string;
+  ocr_processed_at?: string;
+  metadata?: Record<string, any>;
+  extracted_entities?: Record<string, string[]>;
 }
 
 export interface DocumentVersion {

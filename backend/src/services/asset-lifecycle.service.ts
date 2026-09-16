@@ -107,7 +107,6 @@ export class AssetLifecycleService {
             });
 
             // Create asset record
-            const assetId = uuidv4();
             const now = new Date();
 
             const initialHistoryEntry: AssetStateHistoryEntry = {
@@ -468,7 +467,7 @@ export class AssetLifecycleService {
                     condition_notes: historyEntry.condition_notes,
                     witness_user_id: historyEntry.witness_user_id
                 }
-            );
+            });
 
             // Update asset with new custody TX ID
             await client.query(

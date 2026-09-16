@@ -23,21 +23,24 @@ import {
   Trash2,
   FileText,
   ShieldCheck,
-  Timeline,
+  History,
   GitBranch,
   FileSignature,
   Users,
   Download,
 } from 'lucide-react';
-import { casesApi } from '../../services/api';
-import { Case, CaseStatus, CasePriority } from '../../types';
+import { casesApi } from '../services/api';
+import { Case, CaseStatus, CasePriority } from '../types';
 import { toast } from 'react-hot-toast';
+
+const caseStatuses: CaseStatus[] = ['OPEN', 'UNDER_INVESTIGATION', 'CHARGE_SHEET_FILED', 'TRIAL_IN_PROGRESS', 'JUDGMENT_RESERVED', 'DISPOSED', 'APPEALED', 'CLOSED'];
+const casePriorities: CasePriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 const filterSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  status: z.nativeEnum(CaseStatus).optional(),
-  priority: z.nativeEnum(CasePriority).optional(),
+  status: z.enum(caseStatuses as [CaseStatus, ...CaseStatus[]]).optional(),
+  priority: z.enum(casePriorities as [CasePriority, ...CasePriority[]]).optional(),
   search: z.string().optional(),
   sort_by: z.string().optional(),
   sort_order: z.enum(['asc', 'desc']).default('desc'),
@@ -186,7 +189,7 @@ export function CasesPage() {
               <label className="label">Status</label>
               <select {...register('status')} className="input">
                 <option value="">All Statuses</option>
-                {Object.values(CaseStatus).map(s => (
+                {caseStatuses.map(s => (
                   <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
                 ))}
               </select>
@@ -195,7 +198,7 @@ export function CasesPage() {
               <label className="label">Priority</label>
               <select {...register('priority')} className="input">
                 <option value="">All Priorities</option>
-                {Object.values(CasePriority).map(p => (
+                {casePriorities.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -320,7 +323,7 @@ export function CasesPage() {
                               className="p-2 text-gray-500 hover:text-primary-600 hover-bg-gray-100 rounded-lg"
                               title="Timeline"
                             >
-                              <Timeline className="w-4 h-4" />
+                              <History className="w-4 h-4" />
                             </Link>
                             <div className="relative">
                               <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">

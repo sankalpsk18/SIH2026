@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { Scale, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -226,7 +226,7 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-gray-500">
-          © 2024 ADALAT360 - Secure Digital Evidence Management System
+          © 2026 ADALAT360 - Secure Digital Evidence Management System
         </p>
       </div>
     </div>

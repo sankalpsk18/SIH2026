@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verifyMfa = async (code: string, type: 'totp' | 'backup'): Promise<void> => {
     try {
-      const token = useAuthStore.getState().mfaToken;
+      const token = useAuthStore.getState().mfaToken ?? undefined;
       if (!token) throw new Error('No MFA session');
 
       const response = await authApi.mfaVerify(token, { code, type });
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = useAuthStore.getState().accessToken;
       const refresh = useAuthStore.getState().refreshToken;
-      await authApi.logout(token, refresh);
+      await authApi.logout(token ?? undefined, refresh ?? undefined);
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

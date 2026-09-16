@@ -24,15 +24,19 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react';
-import { documentsApi } from '../../services/api';
-import { Document, DocumentType, DocumentStatus } from '../../types';
+import { documentsApi } from '../services/api';
+import { Document, DocumentType, DocumentStatus } from '../types';
 import { toast } from 'react-hot-toast';
+
+const documentTypes: DocumentType[] = ['FIR', 'INVESTIGATION_RECORD', 'WITNESS_STATEMENT', 'CHARGE_SHEET', 'COURT_FILING', 'EVIDENCE_RECORD', 'FORENSIC_REPORT', 'LEGAL_NOTICE', 'JUDGMENT', 'ORDER', 'SUMMONS', 'WARRANT', 'BAIL_APPLICATION', 'AFFIDAVIT', 'EXHIBIT_LIST', 'SEIZURE_MEMO', 'PANCHNAMA', 'CASE_DIARY', 'OTHER'];
+const documentStatuses: DocumentStatus[] = ['DRAFT', 'SUBMITTED', 'VERIFIED', 'APPROVED', 'REJECTED', 'ARCHIVED', 'REDACTED'];
 
 const filterSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  documentType: z.nativeEnum(DocumentType).optional(),
-  status: z.nativeEnum(DocumentStatus).optional(),
+  caseId: z.string().optional(),
+  documentType: z.enum(documentTypes as [DocumentType, ...DocumentType[]]).optional(),
+  status: z.enum(documentStatuses as [DocumentStatus, ...DocumentStatus[]]).optional(),
   uploadedBy: z.string().uuid().optional(),
   tags: z.array(z.string()).optional(),
   search: z.string().optional(),
@@ -72,12 +76,19 @@ export function DocumentsPage() {
   }, [page, limit, caseId]);
 
   const loadDocuments = async () => {
+    if (!selectedCaseId) {
+      // No case selected - show empty state
+      setDocuments([]);
+      setTotal(0);
+      setTotalPages(1);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const params = {
         page,
         limit,
-        caseId: selectedCaseId || undefined,
       };
       const response = await documentsApi.listByCase(selectedCaseId, params);
       setDocuments(response.data.documents);
@@ -113,13 +124,13 @@ export function DocumentsPage() {
       const response = await documentsApi.download(document.id);
       const blob = response.data;
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.original_filename;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
     } catch (error: any) {
       toast.error('Failed to download document');
     }
@@ -167,7 +178,7 @@ export function DocumentsPage() {
             <label className="label">Document Type</label>
             <select {...register('documentType')} className="input">
               <option value="">All Types</option>
-              {Object.values(DocumentType).map(t => (
+              {documentTypes.map(t => (
                 <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
               ))}
             </select>
@@ -176,7 +187,7 @@ export function DocumentsPage() {
             <label className="label">Status</label>
             <select {...register('status')} className="input">
               <option value="">All Statuses</option>
-              {Object.values(DocumentStatus).map(s => (
+              {documentStatuses.map(s => (
                 <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
               ))}
             </select>
@@ -254,7 +265,7 @@ export function DocumentsPage() {
                             </Link>
                             <button onClick={() => handleDownload(doc)} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" title="Download">
                               <Download className="w-4 h-4" />
-                            </Link>
+                            </button>
                             <Link to={`/documents/${doc.id}/versions`} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" title="Versions">
                               <Clock className="w-4 h-4" />
                             </Link>

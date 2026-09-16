@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Loader2, Shield, AlertCircle, CheckCircle2, RotateCcw, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';

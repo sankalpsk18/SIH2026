@@ -15,25 +15,36 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { RolePermissions, UserRole } from './types';
 import { ROLE_PERMISSIONS } from './types';
 
-// Lazy load page components for code splitting
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const CasesPage = lazy(() => import('./pages/CasesPage'));
-const CaseDetailPage = lazy(() => import('./pages/CaseDetailPage'));
-const DocumentsPage = lazy(() => import('./pages/DocumentsPage'));
-const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage'));
-const EvidencePage = lazy(() => import('./pages/EvidencePage'));
-const EvidenceDetailPage = lazy(() => import('./pages/EvidenceDetailPage'));
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const TimelinePage = lazy(() => import('./pages/TimelinePage'));
-const EntityGraphPage = lazy(() => import('./pages/EntityGraphPage'));
-const BsaCertificatePage = lazy(() => import('./pages/BsaCertificatePage'));
-const AuditPage = lazy(() => import('./pages/AuditPage'));
-const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
-const AdminConfigPage = lazy(() => import('./pages/admin/AdminConfigPage'));
-const AdminBlockchainPage = lazy(() => import('./pages/admin/AdminBlockchainPage'));
-const RtiPage = lazy(() => import('./pages/RtiPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const lazyPage = (importer: () => Promise<any>, exportName?: string) =>
+  lazy(async () => {
+    const module = await importer();
+    const resolved = exportName ? module[exportName] ?? module.default : module.default;
+
+    if (!resolved) {
+      throw new Error(`Failed to resolve page export for ${exportName ?? 'default'}`);
+    }
+
+    return { default: resolved };
+  });
+
+const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage');
+const CasesPage = lazyPage(() => import('./pages/CasesPage'), 'CasesPage');
+const CaseDetailPage = lazyPage(() => import('./pages/CaseDetailPage'), 'CaseDetailPage');
+const DocumentsPage = lazyPage(() => import('./pages/DocumentsPage'), 'DocumentsPage');
+const DocumentDetailPage = lazyPage(() => import('./pages/DocumentDetailPage'), 'DocumentDetailPage');
+const EvidencePage = lazyPage(() => import('./pages/EvidencePage'), 'EvidencePage');
+const EvidenceDetailPage = lazyPage(() => import('./pages/EvidenceDetailPage'), 'EvidenceDetailPage');
+const SearchPage = lazyPage(() => import('./pages/SearchPage'), 'SearchPage');
+const TimelinePage = lazyPage(() => import('./pages/TimelinePage'), 'TimelinePage');
+const EntityGraphPage = lazyPage(() => import('./pages/EntityGraphPage'), 'EntityGraphPage');
+const BsaCertificatePage = lazyPage(() => import('./pages/BsaCertificatePage'), 'BsaCertificatePage');
+const AuditPage = lazyPage(() => import('./pages/AuditPage'), 'AuditPage');
+const AdminUsersPage = lazyPage(() => import('./pages/admin/AdminUsersPage'), 'AdminUsersPage');
+const AdminConfigPage = lazyPage(() => import('./pages/admin/AdminConfigPage'), 'AdminConfigPage');
+const AdminBlockchainPage = lazyPage(() => import('./pages/admin/AdminBlockchainPage'), 'AdminBlockchainPage');
+const RtiPage = lazyPage(() => import('./pages/RtiPage'), 'RtiPage');
+const ProfilePage = lazyPage(() => import('./pages/ProfilePage'), 'ProfilePage');
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage'), 'SettingsPage');
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -109,10 +120,12 @@ function App() {
           <Route path="cases/:caseId" element={<CaseDetailPage />} />
 
           {/* Documents */}
+          <Route path="documents" element={<DocumentsPage />} />
           <Route path="cases/:caseId/documents" element={<DocumentsPage />} />
           <Route path="documents/:documentId" element={<DocumentDetailPage />} />
 
           {/* Evidence */}
+          <Route path="evidence" element={<EvidencePage />} />
           <Route path="cases/:caseId/evidence" element={<EvidencePage />} />
           <Route path="evidence/:evidenceId" element={<EvidenceDetailPage />} />
 
@@ -120,7 +133,9 @@ function App() {
           <Route path="search" element={<SearchPage />} />
 
           {/* Timeline & Analytics */}
+          <Route path="timeline" element={<TimelinePage />} />
           <Route path="cases/:caseId/timeline" element={<TimelinePage />} />
+          <Route path="entity-graph" element={<EntityGraphPage />} />
           <Route path="cases/:caseId/entity-graph" element={<EntityGraphPage />} />
 
           {/* BSA Certificates */}

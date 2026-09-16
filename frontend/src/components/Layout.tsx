@@ -11,7 +11,7 @@ import {
   FolderKanban,
   FileText,
   Search,
-  Timeline,
+  History,
   GitBranch,
   ShieldCheck,
   FileCheck,
@@ -39,7 +39,7 @@ const navigation = [
   { name: 'Search', href: '/search', icon: Search, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
   { name: 'Documents', href: '/documents', icon: FileText, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'CENTRAL_ADMIN'] },
   { name: 'Evidence', href: '/evidence', icon: ShieldCheck, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
-  { name: 'Timeline', href: '/timeline', icon: Timeline, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
+  { name: 'Timeline', href: '/timeline', icon: History, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
   { name: 'Entity Graph', href: '/entity-graph', icon: GitBranch, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
   { name: 'BSA Certificates', href: '/bsa', icon: FileSignature, roles: ['PROSECUTOR', 'COURT', 'CENTRAL_ADMIN'] },
   { name: 'RTI Requests', href: '/rti', icon: ClipboardList, roles: ['INVESTIGATING_OFFICER', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
@@ -58,14 +58,15 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const userRole = user?.role as any;
+  const userRole = user?.role ?? 'INVESTIGATING_OFFICER';
 
   const filteredNav = navigation.filter(item => item.roles.includes(userRole));
   const filteredAdminNav = adminNavigation.filter(item => item.roles.includes(userRole));
 
   const hasPermission = (permission: string) => {
     if (!user) return false;
-    return ROLE_PERMISSIONS[userRole]?.[permission as keyof typeof ROLE_PERMISSIONS[typeof userRole]] ?? false;
+    const permissions = ROLE_PERMISSIONS[userRole] ?? ROLE_PERMISSIONS.INVESTIGATING_OFFICER;
+    return Boolean((permissions as unknown as Record<string, boolean>)[permission]);
   };
 
   return (

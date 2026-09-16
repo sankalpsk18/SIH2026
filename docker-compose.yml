@@ -22,7 +22,7 @@ services:
       - adalat360-network
 
   mongodb:
-    image: mongo:6-alpine
+    image: mongo:6
     container_name: adalat360-mongodb
     environment:
       MONGO_INITDB_DATABASE: adalat360
@@ -55,7 +55,7 @@ services:
       - adalat360-network
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: adalat360-minio
     command: server /data --console-address ":9001"
     ports:
@@ -76,7 +76,7 @@ services:
 
   # Initialize MinIO bucket
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: adalat360-minio-init
     depends_on:
       - minio

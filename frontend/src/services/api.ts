@@ -4,7 +4,55 @@
 // ============================================================================
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '../hooks/useAuthStore';
+
+// Get auth tokens from localStorage directly to avoid React context issues
+const getAccessToken = (): string | null => {
+  try {
+    const auth = localStorage.getItem('adalat360-auth');
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      return parsed.state?.accessToken || null;
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+  return null;
+};
+
+const getRefreshToken = (): string | null => {
+  try {
+    const auth = localStorage.getItem('adalat360-auth');
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      return parsed.state?.refreshToken || null;
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+  return null;
+};
+
+const setTokens = (accessToken: string, refreshToken: string): void => {
+  try {
+    const auth = localStorage.getItem('adalat360-auth');
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      parsed.state = {
+        ...parsed.state,
+        accessToken,
+        refreshToken,
+        isAuthenticated: true,
+      };
+      localStorage.setItem('adalat360-auth', JSON.stringify(parsed));
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+};
+
+const clearAuth = (): void => {
+  localStorage.removeItem('adalat360-auth');
+};
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -19,7 +67,7 @@ const api = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = useAuthStore.getState().accessToken;
+    const token = getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -40,14 +88,14 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = useAuthStore.getState().refreshToken;
+        const refreshToken = getRefreshToken();
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refresh_token: refreshToken,
           });
 
           const { access_token, refresh_token } = response.data;
-          useAuthStore.getState().setTokens(access_token, refresh_token);
+          setTokens(access_token, refresh_token);
 
           // Retry original request
           if (originalRequest.headers) {
@@ -57,7 +105,7 @@ api.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed - logout
-        useAuthStore.getState().logout();
+        clearAuth();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -95,6 +143,12 @@ export const authApi = {
   changePassword: (data: { current_password: string; new_password: string; confirm_password: string }) =>
     api.post('/auth/change-password', data),
 
+  forgotPassword: (data: { email: string }) =>
+    api.post('/auth/forgot-password', data),
+
+  resetPassword: (data: { token: string; new_password: string; confirm_password: string }) =>
+    api.post('/auth/reset-password', data),
+
   // MFA
   setupMfa: () => api.post('/auth/mfa/setup'),
   enableMfa: (code: string) => api.post('/auth/mfa/enable', { verification_code: code }),
@@ -123,6 +177,8 @@ export const casesApi = {
     status?: string;
     priority?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get('/cases', { params }),
 
   get: (caseId: string) => api.get(`/cases/${caseId}`),
@@ -166,6 +222,8 @@ export const documentsApi = {
     documentType?: string;
     status?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get(`/documents/case/${caseId}`, { params }),
 
   get: (documentId: string) => api.get(`/documents/${documentId}`),
@@ -226,6 +284,8 @@ export const evidenceApi = {
     evidenceType?: string;
     status?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get(`/evidence/case/${caseId}`, { params }),
 
   get: (evidenceId: string) => api.get(`/evidence/${evidenceId}`),

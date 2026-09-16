@@ -29,16 +29,21 @@ import {
   Gavel,
   Truck,
   Archive,
+  CheckCircle2,
 } from 'lucide-react';
-import { evidenceApi } from '../../services/api';
-import { Evidence, EvidenceType, EvidenceStatus } from '../../types';
+import { evidenceApi } from '../services/api';
+import { Evidence, EvidenceType, EvidenceStatus } from '../types';
 import { toast } from 'react-hot-toast';
+
+const evidenceTypes: EvidenceType[] = ['DIGITAL', 'PHYSICAL', 'DOCUMENTARY', 'BIOLOGICAL', 'CHEMICAL', 'FIREARM', 'VEHICLE', 'ELECTRONIC_DEVICE', 'FINANCIAL_RECORD', 'OTHER'];
+const evidenceStatuses: EvidenceStatus[] = ['SEIZED', 'IN_CUSTODY', 'SENT_FOR_ANALYSIS', 'UNDER_ANALYSIS', 'ANALYSIS_COMPLETE', 'PRESENTED_IN_COURT', 'RETURNED', 'DISPOSED', 'DESTROYED'];
 
 const filterSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  evidenceType: z.nativeEnum(EvidenceType).optional(),
-  status: z.nativeEnum(EvidenceStatus).optional(),
+  caseId: z.string().optional(),
+  evidenceType: z.enum(evidenceTypes as [EvidenceType, ...EvidenceType[]]).optional(),
+  status: z.enum(evidenceStatuses as [EvidenceStatus, ...EvidenceStatus[]]).optional(),
   current_custodian_id: z.string().uuid().optional(),
   forensic_lab_id: z.string().uuid().optional(),
   search: z.string().optional(),
@@ -78,12 +83,19 @@ export function EvidencePage() {
   }, [page, limit, caseId]);
 
   const loadEvidence = async () => {
+    if (!selectedCaseId) {
+      // No case selected - show empty state
+      setEvidence([]);
+      setTotal(0);
+      setTotalPages(1);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const params = {
         page,
         limit,
-        caseId: selectedCaseId || undefined,
       };
       const response = await evidenceApi.listByCase(selectedCaseId, params);
       setEvidence(response.data.evidence);
@@ -165,7 +177,7 @@ export function EvidencePage() {
             <label className="label">Evidence Type</label>
             <select {...register('evidenceType')} className="input">
               <option value="">All Types</option>
-              {Object.values(EvidenceType).map(t => (
+              {evidenceTypes.map(t => (
                 <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
               ))}
             </select>
@@ -174,7 +186,7 @@ export function EvidencePage() {
             <label className="label">Status</label>
             <select {...register('status')} className="input">
               <option value="">All Statuses</option>
-              {Object.values(EvidenceStatus).map(s => (
+              {evidenceStatuses.map(s => (
                 <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
               ))}
             </select>
