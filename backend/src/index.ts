@@ -128,7 +128,8 @@ app.get('/health/ready', async (req, res) => {
 // API ROUTES
 // ============================================================================
 
-app.use(config.server.apiPrefix, apiRouter);
+// apiRouter already includes config.server.apiPrefix on each route.
+app.use('/', apiRouter);
 
 // ============================================================================
 // ERROR HANDLING
@@ -226,7 +227,8 @@ async function start(): Promise<void> {
 // Export for testing
 export { app, start };
 
-// Start if not in test mode
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Start the server outside test runs. The explicit test guard also works on Windows,
+// where the executable path does not match the URL string format above.
+if (process.env.NODE_ENV !== 'test') {
     start();
 }

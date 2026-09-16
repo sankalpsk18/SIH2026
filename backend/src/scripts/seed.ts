@@ -5,9 +5,11 @@
  */
 
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../config/index.js';
-import { getPgPool, getMongoDb, closeDatabaseConnections, pgQuery } from '../config/database.js';
+import { getPgPool, getMongoDb, closeDatabaseConnections, pgQuery, pgTransaction } from '../config/database.js';
+import { DocumentType, DocumentStatus, EvidenceType, EvidenceStatus, CustodyAction, UserRole, PermissionLevel } from '../types/database.js';
 
 async function seedDatabase(): Promise<void> {
     console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -301,19 +303,32 @@ async function seedDatabase(): Promise<void> {
         // ============================================================
         console.log('Seeding case assignments...');
 
-        const assignments = [
-            { case_id: caseId1, user_id: ioId, role_in_case: 'INVESTIGATING_OFFICER', permission_level: ['READ','WRITE','SIGN','EXPORT'], assigned_by: adminId },
-            { case_id: caseId1, user_id: io2Id, role_in_case: 'ASSISTANT_IO', permission_level: ['READ','WRITE'], assigned_by: adminId },
-            { case_id: caseId1, user_id: flId, role_in_case: 'FORENSIC_EXAMINER', permission_level: ['READ','WRITE','SIGN','VERIFY'], assigned_by: adminId },
-            { case_id: caseId1, user_id: proId, role_in_case: 'PROSECUTOR', permission_level: ['READ','WRITE','SIGN','EXPORT','REDACT'], assigned_by: adminId },
-            { case_id: caseId1, user_id: crtId, role_in_case: 'PRESIDING_JUDGE', permission_level: ['READ','VERIFY','SIGN'], assigned_by: adminId },
-            { case_id: caseId2, user_id: io2Id, role_in_case: 'INVESTIGATING_OFFICER', permission_level: ['READ','WRITE','SIGN','EXPORT'], assigned_by: adminId },
-            { case_id: caseId2, user_id: flId, role_in_case: 'FORENSIC_EXAMINER', permission_level: ['READ','WRITE','SIGN','VERIFY'], assigned_by: adminId },
-            { case_id: caseId2, user_id: proId, role_in_case: 'PROSECUTOR', permission_level: ['READ','WRITE','SIGN','EXPORT','REDACT'], assigned_by: adminId },
-            { case_id: caseId2, user_id: crtId, role_in_case: 'PRESIDING_JUDGE', permission_level: ['READ','VERIFY','SIGN'], assigned_by: adminId },
-        ];
+        // Get existing case IDs from database
+        const casesResult = await client.query(`SELECT id, case_number FROM cases WHERE case_number IN ('FIR/2024/DEL/001234', 'FIR/2024/MUM/005678')`);
+        const caseMap: Record<string, string> = {};
+        for (const row of casesResult.rows) {
+            caseMap[row.case_number] = row.id;
+        }
 
-        for (const a of assignments) {
+        const case1Id = caseMap['FIR/2024/DEL/001234'];
+        const case2Id = caseMap['FIR/2024/MUM/005678'];
+
+        if (!case1Id || !case2Id) {
+            console.warn('  ⚠ Cases not found, skipping assignments');
+        } else {
+            const assignments = [
+                { case_id: case1Id, user_id: ioId, role_in_case: 'INVESTIGATING_OFFICER', permission_level: ['READ','WRITE','SIGN','EXPORT'], assigned_by: adminId },
+                { case_id: case1Id, user_id: io2Id, role_in_case: 'ASSISTANT_IO', permission_level: ['READ','WRITE'], assigned_by: adminId },
+                { case_id: case1Id, user_id: flId, role_in_case: 'FORENSIC_EXAMINER', permission_level: ['READ','WRITE','SIGN','VERIFY'], assigned_by: adminId },
+                { case_id: case1Id, user_id: proId, role_in_case: 'PROSECUTOR', permission_level: ['READ','WRITE','SIGN','EXPORT','REDACT'], assigned_by: adminId },
+                { case_id: case1Id, user_id: crtId, role_in_case: 'PRESIDING_JUDGE', permission_level: ['READ','VERIFY','SIGN'], assigned_by: adminId },
+                { case_id: case2Id, user_id: io2Id, role_in_case: 'INVESTIGATING_OFFICER', permission_level: ['READ','WRITE','SIGN','EXPORT'], assigned_by: adminId },
+                { case_id: case2Id, user_id: flId, role_in_case: 'FORENSIC_EXAMINER', permission_level: ['READ','WRITE','SIGN','VERIFY'], assigned_by: adminId },
+                { case_id: case2Id, user_id: proId, role_in_case: 'PROSECUTOR', permission_level: ['READ','WRITE','SIGN','EXPORT','REDACT'], assigned_by: adminId },
+                { case_id: case2Id, user_id: crtId, role_in_case: 'PRESIDING_JUDGE', permission_level: ['READ','VERIFY','SIGN'], assigned_by: adminId },
+            ];
+
+            for (const a of assignments) {
             await client.query(
                 `INSERT INTO case_assignments (id, case_id, user_id, role_in_case, permission_level, assigned_by, assigned_at, is_active)
                  VALUES ($1,$2,$3,$4,$5,$6,NOW(),TRUE)
@@ -322,6 +337,7 @@ async function seedDatabase(): Promise<void> {
             );
         }
         console.log('  ✓ Case assignments seeded');
+        }
 
         // ============================================================
         // SEED SYSTEM CONFIG

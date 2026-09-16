@@ -102,7 +102,10 @@ router.get('/',
     validate(paginationQuerySchema),
     async (req, res, next) => {
         try {
-            const { page, limit, status, priority, assigned_officer_id, search } = req.query as any;
+            // Explicitly convert to numbers as safety measure
+            const page = Number(req.query.page) || 1;
+            const limit = Number(req.query.limit) || 20;
+            const { status, priority, assigned_officer_id, search } = req.query as any;
             const offset = (page - 1) * limit;
 
             const conditions: string[] = ['c.deleted_at IS NULL'];

@@ -204,7 +204,7 @@ db.createCollection('audit_logs_detailed', {
                 event_id: { bsonType: 'string', maxLength: 100 },
                 event_type: { bsonType: 'string', maxLength: 100 },
                 event_category: { bsonType: 'string', maxLength: 50 },
-                severity: { bsonType: 'string', enum: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default: 'INFO' },
+                severity: { bsonType: 'string', enum: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']},
                 user_id: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
                 user_role: { bsonType: 'string' },
                 user_ip: { bsonType: 'string' },
@@ -333,7 +333,7 @@ db.createCollection('rti_requests_detailed', {
                 case_ids: { bsonType: 'array', items: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' } },
                 document_ids: { bsonType: 'array', items: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' } },
                 evidence_ids: { bsonType: 'array', items: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' } },
-                status: { bsonType: 'string', enum: ['RECEIVED', 'UNDER_PROCESS', 'INFORMATION_GATHERED', 'RESPONDED', 'DENIED', 'APPEALED', 'CLOSED'], default: 'RECEIVED' },
+                status: { bsonType: 'string', enum: ['RECEIVED', 'UNDER_PROCESS', 'INFORMATION_GATHERED', 'RESPONDED', 'DENIED', 'APPEALED', 'CLOSED']},
                 fee_paid: { bsonType: 'double', minimum: 0 },
                 fee_receipt_number: { bsonType: 'string', maxLength: 100 },
                 assigned_to: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
@@ -342,10 +342,10 @@ db.createCollection('rti_requests_detailed', {
                 response_documents: { bsonType: 'array', items: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' } },
                 denied_reasons: { bsonType: 'array', items: { bsonType: 'string' } },
                 exemption_sections: { bsonType: 'array', items: { bsonType: 'string' } },
-                first_appeal_filed: { bsonType: 'bool', default: false },
+                first_appeal_filed: { bsonType: 'bool' },
                 first_appeal_date: { bsonType: 'date' },
                 first_appeal_details: { bsonType: 'object' },
-                second_appeal_filed: { bsonType: 'bool', default: false },
+                second_appeal_filed: { bsonType: 'bool' },
                 second_appeal_date: { bsonType: 'date' },
                 second_appeal_details: { bsonType: 'object' },
                 received_at: { bsonType: 'date' },
@@ -367,7 +367,7 @@ db.createCollection('system_config_mongo', {
                 config_key: { bsonType: 'string', maxLength: 100 },
                 config_value: { bsonType: 'object' },
                 description: { bsonType: 'string' },
-                is_sensitive: { bsonType: 'bool', default: false },
+                is_sensitive: { bsonType: 'bool' },
                 updated_by: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
                 updated_at: { bsonType: 'date' }
             }
@@ -394,7 +394,7 @@ db.createCollection('anomaly_events', {
                 baseline_metrics: { bsonType: 'object' },
                 current_metrics: { bsonType: 'object' },
                 risk_score: { bsonType: 'double', minimum: 0, maximum: 100 },
-                status: { bsonType: 'string', enum: ['OPEN', 'INVESTIGATING', 'FALSE_POSITIVE', 'CONFIRMED', 'RESOLVED'], default: 'OPEN' },
+                status: { bsonType: 'string', enum: ['OPEN', 'INVESTIGATING', 'FALSE_POSITIVE', 'CONFIRMED', 'RESOLVED']},
                 assigned_to: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
                 investigated_by: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
                 investigated_at: { bsonType: 'date' },
@@ -416,13 +416,13 @@ db.createCollection('notification_logs', {
                 recipient_user_id: { bsonType: 'string', pattern: '^[0-9a-f-]{36}$' },
                 recipient_role: { bsonType: 'string' },
                 type: { bsonType: 'string', enum: ['CASE_ASSIGNED', 'DOCUMENT_UPLOADED', 'EVIDENCE_SEIZED', 'CUSTODY_TRANSFER', 'SIGNATURE_REQUIRED', 'BSA_CERTIFICATE_ISSUED', 'RTI_RECEIVED', 'ANOMALY_DETECTED', 'SYSTEM_ALERT', 'DEADLINE_REMINDER'] },
-                priority: { bsonType: 'string', enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT'], default: 'NORMAL' },
+                priority: { bsonType: 'string', enum: ['LOW', 'NORMAL', 'HIGH', 'URGENT']},
                 title: { bsonType: 'string', maxLength: 200 },
                 message: { bsonType: 'string' },
                 action_url: { bsonType: 'string' },
                 action_label: { bsonType: 'string' },
                 metadata: { bsonType: 'object' },
-                is_read: { bsonType: 'bool', default: false },
+                is_read: { bsonType: 'bool' },
                 read_at: { bsonType: 'date' },
                 sent_via: { bsonType: 'array', items: { bsonType: 'string', enum: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] } },
                 delivery_status: { bsonType: 'object' },
@@ -437,118 +437,118 @@ db.createCollection('notification_logs', {
 // ============================================================================
 
 // document_metadata indexes
-db.document_metadata.createIndex({ document_id: 1 }, { unique: true, name: 'idx_doc_meta_doc_id' });
-db.document_metadata.createIndex({ case_id: 1, name: 'idx_doc_meta_case_id' });
-db.document_metadata.createIndex({ parent_document_id: 1, name: 'idx_doc_meta_parent' });
-db.document_metadata.createIndex({ file_hash_sha256: 1, name: 'idx_doc_meta_hash' });
-db.document_metadata.createIndex({ uploaded_by: 1, name: 'idx_doc_meta_uploader' });
-db.document_metadata.createIndex({ created_at: -1, name: 'idx_doc_meta_created' });
-db.document_metadata.createIndex({ 'extracted_entities.persons': 1, name: 'idx_doc_meta_entities_persons' });
-db.document_metadata.createIndex({ 'extracted_entities.case_numbers': 1, name: 'idx_doc_meta_entities_cases' });
-db.document_metadata.createIndex({ tags: 1, name: 'idx_doc_meta_tags' });
-db.document_metadata.createIndex({ is_latest_version: 1, name: 'idx_doc_meta_latest' });
-db.document_metadata.createIndex({ deleted_at: 1 }, { partialFilterExpression: { deleted_at: { $exists: true } }, name: 'idx_doc_meta_deleted' });
+db.document_metadata.createIndex({ document_id: 1 }, { unique: true, name: 'idx_document_metadata_document_id' });
+db.document_metadata.createIndex({ case_id: 1 }, { name: 'idx_doc_meta_case_id' });
+db.document_metadata.createIndex({ parent_document_id: 1 }, { name: 'idx_doc_meta_parent' });
+db.document_metadata.createIndex({ file_hash_sha256: 1 }, { name: 'idx_doc_meta_hash' });
+db.document_metadata.createIndex({ uploaded_by: 1 }, { name: 'idx_doc_meta_uploader' });
+db.document_metadata.createIndex({ created_at: -1 }, { name: 'idx_doc_meta_created' });
+db.document_metadata.createIndex({ 'extracted_entities.persons': 1 }, { name: 'idx_doc_meta_entities_persons' });
+db.document_metadata.createIndex({ 'extracted_entities.case_numbers': 1 }, { name: 'idx_doc_meta_entities_cases' });
+db.document_metadata.createIndex({ tags: 1 }, { name: 'idx_doc_meta_tags' });
+db.document_metadata.createIndex({ is_latest_version: 1 }, { name: 'idx_doc_meta_latest' });
+db.document_metadata.createIndex({ deleted_at: 1 }, { partialFilterExpression: { deleted_at: { $exists: true } } }, { name: 'idx_doc_meta_deleted' });
 
 // evidence_metadata indexes
-db.evidence_metadata.createIndex({ evidence_id: 1 }, { unique: true, name: 'idx_evi_meta_evidence_id' });
-db.evidence_metadata.createIndex({ case_id: 1, name: 'idx_evi_meta_case_id' });
-db.evidence_metadata.createIndex({ qr_code_hash: 1 }, { unique: true, name: 'idx_evi_meta_qr_hash' });
-db.evidence_metadata.createIndex({ evidence_number: 1 }, { unique: true, name: 'idx_evi_meta_number' });
-db.evidence_metadata.createIndex({ evidence_type: 1, name: 'idx_evi_meta_type' });
-db.evidence_metadata.createIndex({ status: 1, name: 'idx_evi_meta_status' });
-db.evidence_metadata.createIndex({ current_custodian_id: 1, name: 'idx_evi_meta_custodian' });
-db.evidence_metadata.createIndex({ forensic_lab_id: 1, name: 'idx_evi_meta_lab' });
-db.evidence_metadata.createIndex({ seized_at: -1, name: 'idx_evi_meta_seized' });
-db.evidence_metadata.createIndex({ deleted_at: 1 }, { partialFilterExpression: { deleted_at: { $exists: true } }, name: 'idx_evi_meta_deleted' });
+db.evidence_metadata.createIndex({ evidence_id: 1 }, { unique: true, name: 'idx_evidence_metadata_evidence_id' });
+db.evidence_metadata.createIndex({ case_id: 1 }, { name: 'idx_evi_meta_case_id' });
+db.evidence_metadata.createIndex({ qr_code_hash: 1 }, { unique: true, name: 'idx_evidence_metadata_qr_code_hash' });
+db.evidence_metadata.createIndex({ evidence_number: 1 }, { unique: true, name: 'idx_evidence_metadata_evidence_number' });
+db.evidence_metadata.createIndex({ evidence_type: 1 }, { name: 'idx_evi_meta_type' });
+db.evidence_metadata.createIndex({ status: 1 }, { name: 'idx_evi_meta_status' });
+db.evidence_metadata.createIndex({ current_custodian_id: 1 }, { name: 'idx_evi_meta_custodian' });
+db.evidence_metadata.createIndex({ forensic_lab_id: 1 }, { name: 'idx_evi_meta_lab' });
+db.evidence_metadata.createIndex({ seized_at: -1 }, { name: 'idx_evi_meta_seized' });
+db.evidence_metadata.createIndex({ deleted_at: 1 }, { partialFilterExpression: { deleted_at: { $exists: true } } }, { name: 'idx_evi_meta_deleted' });
 
 // custody_events indexes
-db.custody_events.createIndex({ event_id: 1 }, { unique: true, name: 'idx_custody_event_id' });
-db.custody_events.createIndex({ tx_id: 1 }, { unique: true, sparse: true, name: 'idx_custody_tx_id' });
-db.custody_events.createIndex({ block_number: 1, name: 'idx_custody_block' });
-db.custody_events.createIndex({ case_id: 1, name: 'idx_custody_case' });
-db.custody_events.createIndex({ document_id: 1, name: 'idx_custody_document' });
-db.custody_events.createIndex({ evidence_id: 1, name: 'idx_custody_evidence' });
-db.custody_events.createIndex({ actor_user_id: 1, name: 'idx_custody_actor' });
-db.custody_events.createIndex({ actor_node_id: 1, name: 'idx_custody_actor_node' });
-db.custody_events.createIndex({ tx_type: 1, name: 'idx_custody_tx_type' });
-db.custody_events.createIndex({ consensus_status: 1, name: 'idx_custody_consensus' });
-db.custody_events.createIndex({ occurred_at: -1, name: 'idx_custody_occurred' });
-db.custody_events.createIndex({ payload_hash: 1, name: 'idx_custody_payload_hash' });
+db.custody_events.createIndex({ event_id: 1 }, { unique: true, name: 'idx_custody_events_event_id' });
+db.custody_events.createIndex({ tx_id: 1 }, { unique: true, sparse: true }, { name: 'idx_custody_tx_id' });
+db.custody_events.createIndex({ block_number: 1 }, { name: 'idx_custody_block' });
+db.custody_events.createIndex({ case_id: 1 }, { name: 'idx_custody_case' });
+db.custody_events.createIndex({ document_id: 1 }, { name: 'idx_custody_document' });
+db.custody_events.createIndex({ evidence_id: 1 }, { name: 'idx_custody_evidence' });
+db.custody_events.createIndex({ actor_user_id: 1 }, { name: 'idx_custody_actor' });
+db.custody_events.createIndex({ actor_node_id: 1 }, { name: 'idx_custody_actor_node' });
+db.custody_events.createIndex({ tx_type: 1 }, { name: 'idx_custody_tx_type' });
+db.custody_events.createIndex({ consensus_status: 1 }, { name: 'idx_custody_consensus' });
+db.custody_events.createIndex({ occurred_at: -1 }, { name: 'idx_custody_occurred' });
+db.custody_events.createIndex({ payload_hash: 1 }, { name: 'idx_custody_payload_hash' });
 
 // audit_logs_detailed indexes
-db.audit_logs_detailed.createIndex({ event_id: 1 }, { unique: true, name: 'idx_audit_event_id' });
-db.audit_logs_detailed.createIndex({ user_id: 1, name: 'idx_audit_user' });
-db.audit_logs_detailed.createIndex({ resource_type: 1, resource_id: 1, name: 'idx_audit_resource' });
-db.audit_logs_detailed.createIndex({ action: 1, name: 'idx_audit_action' });
-db.audit_logs_detailed.createIndex({ outcome: 1, name: 'idx_audit_outcome' });
-db.audit_logs_detailed.createIndex({ occurred_at: -1, name: 'idx_audit_occurred' });
-db.audit_logs_detailed.createIndex({ correlation_id: 1, name: 'idx_audit_correlation' });
-db.audit_logs_detailed.createIndex({ event_type: 1, name: 'idx_audit_event_type' });
-db.audit_logs_detailed.createIndex({ severity: 1, name: 'idx_audit_severity' });
-db.audit_logs_detailed.createIndex({ request_id: 1, name: 'idx_audit_request' });
-db.audit_logs_detailed.createIndex({ anomaly_flags: 1, name: 'idx_audit_anomaly' });
-db.audit_logs_detailed.createIndex({ risk_score: -1, name: 'idx_audit_risk' });
+db.audit_logs_detailed.createIndex({ event_id: 1 }, { unique: true, name: 'idx_audit_logs_event_id' });
+db.audit_logs_detailed.createIndex({ user_id: 1 }, { name: 'idx_audit_user' });
+db.audit_logs_detailed.createIndex({ resource_type: 1, resource_id: 1 }, { name: 'idx_audit_resource' });
+db.audit_logs_detailed.createIndex({ action: 1 }, { name: 'idx_audit_action' });
+db.audit_logs_detailed.createIndex({ outcome: 1 }, { name: 'idx_audit_outcome' });
+db.audit_logs_detailed.createIndex({ occurred_at: -1 }, { name: 'idx_audit_occurred' });
+db.audit_logs_detailed.createIndex({ correlation_id: 1 }, { name: 'idx_audit_correlation' });
+db.audit_logs_detailed.createIndex({ event_type: 1 }, { name: 'idx_audit_event_type' });
+db.audit_logs_detailed.createIndex({ severity: 1 }, { name: 'idx_audit_severity' });
+db.audit_logs_detailed.createIndex({ request_id: 1 }, { name: 'idx_audit_request' });
+db.audit_logs_detailed.createIndex({ anomaly_flags: 1 }, { name: 'idx_audit_anomaly' });
+db.audit_logs_detailed.createIndex({ risk_score: -1 }, { name: 'idx_audit_risk' });
 
 // search_documents indexes
-db.search_documents.createIndex({ resource_type: 1, resource_id: 1 }, { unique: true, name: 'idx_search_resource' });
-db.search_documents.createIndex({ case_id: 1, name: 'idx_search_case' });
-db.search_documents.createIndex({ document_type: 1, name: 'idx_search_doc_type' });
-db.search_documents.createIndex({ evidence_type: 1, name: 'idx_search_evi_type' });
-db.search_documents.createIndex({ tags: 1, name: 'idx_search_tags' });
-db.search_documents.createIndex({ 'entities.persons': 1, name: 'idx_search_entities_persons' });
-db.search_documents.createIndex({ 'entities.case_numbers': 1, name: 'idx_search_entities_cases' });
-db.search_documents.createIndex({ indexed_at: -1, name: 'idx_search_indexed' });
-db.search_documents.createIndex({ access_roles: 1, name: 'idx_search_access_roles' });
-db.search_documents.createIndex({ access_departments: 1, name: 'idx_search_access_depts' });
+db.search_documents.createIndex({ resource_type: 1, resource_id: 1 }, { unique: true, name: 'idx_search_documents_resource' });
+db.search_documents.createIndex({ case_id: 1 }, { name: 'idx_search_case' });
+db.search_documents.createIndex({ document_type: 1 }, { name: 'idx_search_doc_type' });
+db.search_documents.createIndex({ evidence_type: 1 }, { name: 'idx_search_evi_type' });
+db.search_documents.createIndex({ tags: 1 }, { name: 'idx_search_tags' });
+db.search_documents.createIndex({ 'entities.persons': 1 }, { name: 'idx_search_entities_persons' });
+db.search_documents.createIndex({ 'entities.case_numbers': 1 }, { name: 'idx_search_entities_cases' });
+db.search_documents.createIndex({ indexed_at: -1 }, { name: 'idx_search_indexed' });
+db.search_documents.createIndex({ access_roles: 1 }, { name: 'idx_search_access_roles' });
+db.search_documents.createIndex({ access_departments: 1 }, { name: 'idx_search_access_depts' });
 
 // bsa_certificates_metadata indexes
-db.bsa_certificates_metadata.createIndex({ certificate_id: 1 }, { unique: true, name: 'idx_bsa_cert_id' });
-db.bsa_certificates_metadata.createIndex({ certificate_number: 1 }, { unique: true, name: 'idx_bsa_cert_number' });
-db.bsa_certificates_metadata.createIndex({ case_id: 1, name: 'idx_bsa_case' });
-db.bsa_certificates_metadata.createIndex({ document_id: 1, name: 'idx_bsa_document' });
-db.bsa_certificates_metadata.createIndex({ status: 1, name: 'idx_bsa_status' });
-db.bsa_certificates_metadata.createIndex({ issued_by: 1, name: 'idx_bsa_issued_by' });
-db.bsa_certificates_metadata.createIndex({ issued_at: -1, name: 'idx_bsa_issued' });
+db.bsa_certificates_metadata.createIndex({ certificate_id: 1 }, { unique: true, name: 'idx_bsa_certificates_certificate_id' });
+db.bsa_certificates_metadata.createIndex({ certificate_number: 1 }, { unique: true, name: 'idx_bsa_certificates_certificate_number' });
+db.bsa_certificates_metadata.createIndex({ case_id: 1 }, { name: 'idx_bsa_case' });
+db.bsa_certificates_metadata.createIndex({ document_id: 1 }, { name: 'idx_bsa_document' });
+db.bsa_certificates_metadata.createIndex({ status: 1 }, { name: 'idx_bsa_status' });
+db.bsa_certificates_metadata.createIndex({ issued_by: 1 }, { name: 'idx_bsa_issued_by' });
+db.bsa_certificates_metadata.createIndex({ issued_at: -1 }, { name: 'idx_bsa_issued' });
 
 // rti_requests_detailed indexes
-db.rti_requests_detailed.createIndex({ request_number: 1 }, { unique: true, name: 'idx_rti_number' });
-db.rti_requests_detailed.createIndex({ status: 1, name: 'idx_rti_status' });
-db.rti_requests_detailed.createIndex({ assigned_to: 1, name: 'idx_rti_assigned' });
-db.rti_requests_detailed.createIndex({ due_date: 1, name: 'idx_rti_due' });
-db.rti_requests_detailed.createIndex({ received_at: -1, name: 'idx_rti_received' });
+db.rti_requests_detailed.createIndex({ request_number: 1 }, { unique: true, name: 'idx_rti_req_number' });
+db.rti_requests_detailed.createIndex({ status: 1 }, { name: 'idx_rti_status' });
+db.rti_requests_detailed.createIndex({ assigned_to: 1 }, { name: 'idx_rti_assigned' });
+db.rti_requests_detailed.createIndex({ due_date: 1 }, { name: 'idx_rti_due' });
+db.rti_requests_detailed.createIndex({ received_at: -1 }, { name: 'idx_rti_received' });
 
 // system_config_mongo indexes
-db.system_config_mongo.createIndex({ config_key: 1 }, { unique: true, name: 'idx_config_key' });
+db.system_config_mongo.createIndex({ config_key: 1 }, { unique: true, name: 'idx_system_config_config_key' });
 
 // anomaly_events indexes
-db.anomaly_events.createIndex({ event_id: 1 }, { unique: true, name: 'idx_anomaly_event_id' });
-db.anomaly_events.createIndex({ event_type: 1, name: 'idx_anomaly_type' });
-db.anomaly_events.createIndex({ severity: 1, name: 'idx_anomaly_severity' });
-db.anomaly_events.createIndex({ user_id: 1, name: 'idx_anomaly_user' });
-db.anomaly_events.createIndex({ case_id: 1, name: 'idx_anomaly_case' });
-db.anomaly_events.createIndex({ status: 1, name: 'idx_anomaly_status' });
-db.anomaly_events.createIndex({ detected_at: -1, name: 'idx_anomaly_detected' });
-db.anomaly_events.createIndex({ risk_score: -1, name: 'idx_anomaly_risk' });
+db.anomaly_events.createIndex({ event_id: 1 }, { unique: true, name: 'idx_anomaly_events_event_id' });
+db.anomaly_events.createIndex({ event_type: 1 }, { name: 'idx_anomaly_type' });
+db.anomaly_events.createIndex({ severity: 1 }, { name: 'idx_anomaly_severity' });
+db.anomaly_events.createIndex({ user_id: 1 }, { name: 'idx_anomaly_user' });
+db.anomaly_events.createIndex({ case_id: 1 }, { name: 'idx_anomaly_case' });
+db.anomaly_events.createIndex({ status: 1 }, { name: 'idx_anomaly_status' });
+db.anomaly_events.createIndex({ detected_at: -1 }, { name: 'idx_anomaly_detected' });
+db.anomaly_events.createIndex({ risk_score: -1 }, { name: 'idx_anomaly_risk' });
 
 // notification_logs indexes
-db.notification_logs.createIndex({ notification_id: 1 }, { unique: true, name: 'idx_notif_id' });
-db.notification_logs.createIndex({ recipient_user_id: 1, is_read: 1, name: 'idx_notif_recipient_read' });
-db.notification_logs.createIndex({ type: 1, name: 'idx_notif_type' });
-db.notification_logs.createIndex({ priority: 1, name: 'idx_notif_priority' });
-db.notification_logs.createIndex({ created_at: -1, name: 'idx_notif_created' });
+db.notification_logs.createIndex({ notification_id: 1 }, { unique: true, name: 'idx_notification_logs_notification_id' });
+db.notification_logs.createIndex({ recipient_user_id: 1, is_read: 1 }, { name: 'idx_notif_recipient_read' });
+db.notification_logs.createIndex({ type: 1 }, { name: 'idx_notif_type' });
+db.notification_logs.createIndex({ priority: 1 }, { name: 'idx_notif_priority' });
+db.notification_logs.createIndex({ created_at: -1 }, { name: 'idx_notif_created' });
 
 // ============================================================================
 // TTL INDEXES (for automatic cleanup)
 // ============================================================================
 
 // Audit logs detailed - keep for 7 years (2555 days)
-db.audit_logs_detailed.createIndex({ occurred_at: 1 }, { expireAfterSeconds: 2555 * 24 * 60 * 60, name: 'ttl_audit_logs' });
+db.audit_logs_detailed.createIndex({ occurred_at: 1 }, { expireAfterSeconds: 2555 * 24 * 60 * 60 }, { name: 'ttl_audit_logs' });
 
 // Notification logs - keep for 1 year
-db.notification_logs.createIndex({ created_at: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60, name: 'ttl_notifications' });
+db.notification_logs.createIndex({ created_at: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 }, { name: 'ttl_notifications' });
 
 // Anomaly events - keep for 3 years
-db.anomaly_events.createIndex({ detected_at: 1 }, { expireAfterSeconds: 3 * 365 * 24 * 60 * 60, name: 'ttl_anomalies' });
+db.anomaly_events.createIndex({ detected_at: 1 }, { expireAfterSeconds: 3 * 365 * 24 * 60 * 60 }, { name: 'ttl_anomalies' });
 
 // ============================================================================
 // TEXT SEARCH INDEXES
@@ -613,3 +613,7 @@ db.search_documents.createIndex(
 );
 
 print('MongoDB collections and indexes created successfully');
+
+
+
+

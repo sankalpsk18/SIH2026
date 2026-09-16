@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { authApi } from '../../../../services/api';
+import { authApi } from '../../services/api';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Scale, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -86,22 +86,6 @@ export function ResetPasswordPage() {
     if (passwordStrength < 40) return 'Weak';
     if (passwordStrength < 70) return 'Moderate';
     return 'Strong';
-  };
-
-  const onSubmit = async (data: ResetFormData) => {
-    if (!isValidToken) return;
-
-    setIsLoading(true);
-    try {
-      await authApi.resetPassword(data);
-      toast.success('Password has been reset successfully');
-      setTimeout(() => navigate('/login', { replace: true }), 2000);
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to reset password';
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   if (!isValidToken) {

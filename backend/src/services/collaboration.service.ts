@@ -918,7 +918,7 @@ export class CollaborationService {
     // COMMENTS
     // ========================================================================
 
-    async addComment(comment: CommentCreateRequest, authorId: string): Promise<Comment> {
+    async addComment(commentRequest: CommentCreateRequest, authorId: string): Promise<Comment> {
         const authorResult = await pgQuery(
             `SELECT full_name, role FROM users WHERE id = $1`,
             [authorId]
@@ -933,14 +933,14 @@ export class CollaborationService {
 
         const comment: Comment = {
             id: commentId,
-            case_id: comment.case_id,
-            activity_id: comment.activity_id,
+            case_id: commentRequest.case_id,
+            activity_id: commentRequest.activity_id,
             author_user_id: authorId,
             author_name: author.full_name,
             author_role: author.role,
-            content: comment.content,
-            parent_comment_id: comment.parent_comment_id,
-            mentioned_user_ids: comment.mentioned_user_ids || [],
+            content: commentRequest.content,
+            parent_comment_id: commentRequest.parent_comment_id,
+            mentioned_user_ids: commentRequest.mentioned_user_ids || [],
             metadata: {},
             created_at: now,
             updated_at: now,
@@ -949,19 +949,19 @@ export class CollaborationService {
         await pgQuery(
             `INSERT INTO comments (id, case_id, activity_id, author_user_id, author_name, author_role, content, parent_comment_id, mentioned_user_ids, metadata, created_at, updated_at)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-            [commentId, comment.case_id, comment.activity_id, authorId, author.full_name, author.role, comment.content, comment.parent_comment_id, comment.mentioned_user_ids || [], JSON.stringify({}), now, now]
+            [commentId, commentRequest.case_id, commentRequest.activity_id, authorId, author.full_name, author.role, commentRequest.content, commentRequest.parent_comment_id, commentRequest.mentioned_user_ids || [], JSON.stringify({}), now, now]
         );
 
         // Notify mentioned users
-        if (comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0) {
-            for (const userId of comment.mentioned_user_ids) {
+        if (commentRequest.mentioned_user_ids && commentRequest.mentioned_user_ids.length > 0) {
+            for (const userId of commentRequest.mentioned_user_ids) {
                 await this.createNotification({
                     user_id: userId,
                     type: 'ACTIVITY_MENTION',
                     title: `You were mentioned in a comment`,
                     message: `${author.full_name} mentioned you in a comment on case activity.`,
                     priority: 'NORMAL',
-                    activity_id: comment.activity_id,
+                    activity_id: commentRequest.activity_id,
                     channels: ['IN_APP'],
                     metadata: { comment_id: commentId },
                 });
@@ -970,14 +970,14 @@ export class CollaborationService {
 
         return {
             id: commentId,
-            case_id: comment.case_id,
-            activity_id: comment.activity_id,
+            case_id: commentRequest.case_id,
+            activity_id: commentRequest.activity_id,
             author_user_id: authorId,
             author_name: author.full_name,
             author_role: author.role,
-            content: comment.content,
-            parent_comment_id: comment.parent_comment_id,
-            mentioned_user_ids: comment.mentioned_user_ids || [],
+            content: commentRequest.content,
+            parent_comment_id: commentRequest.parent_comment_id,
+            mentioned_user_ids: commentRequest.mentioned_user_ids || [],
             metadata: {},
             created_at: now,
             updated_at: now,

@@ -18,6 +18,7 @@ import {
   Trash2,
   Shield,
   User,
+  User as UserIcon,
   Lock,
   RotateCcw,
   Eye,
@@ -29,15 +30,18 @@ import {
   BadgeCheck,
   AlertTriangle,
 } from 'lucide-react';
-import { authApi } from '../../../services/api';
-import { User, UserRole, UserStatus } from '../../../types';
+import { authApi } from '../../services/api';
+import { type User as UserRecord, type UserRole, type UserStatus } from '../../types';
 import { toast } from 'react-hot-toast';
+
+const userRoles: UserRole[] = ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'];
+const userStatuses: UserStatus[] = ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING_VERIFICATION'];
 
 const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  role: z.nativeEnum(UserRole).optional(),
-  status: z.nativeEnum(UserStatus).optional(),
+  role: z.enum(userRoles as [UserRole, ...UserRole[]]).optional(),
+  status: z.enum(userStatuses as [UserStatus, ...UserStatus[]]).optional(),
   department: z.string().optional(),
   search: z.string().optional(),
 });
@@ -54,7 +58,7 @@ const createUserSchema = z.object({
     .regex(/[0-9]/, 'Must contain number')
     .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'Must contain special character'),
   full_name: z.string().min(2, 'Full name must be at least 2 characters').max(255),
-  role: z.nativeEnum(UserRole),
+  role: z.enum(userRoles as [UserRole, ...UserRole[]]),
   department: z.string().min(2, 'Department is required').max(100),
   designation: z.string().max(100).optional(),
   badge_number: z.string().max(50).optional(),
@@ -67,26 +71,26 @@ const updateUserSchema = z.object({
   phone: z.string().max(20).optional(),
   designation: z.string().max(100).optional(),
   badge_number: z.string().max(50).optional(),
-  status: z.nativeEnum(UserStatus).optional(),
+  status: z.enum(userStatuses as [UserStatus, ...UserStatus[]]).optional(),
   department: z.string().max(100).optional(),
 });
 
 type UpdateUserFormData = z.infer<typeof updateUserSchema>;
 
 const updateRoleSchema = z.object({
-  role: z.nativeEnum(UserRole),
+  role: z.enum(userRoles as [UserRole, ...UserRole[]]),
 });
 
 export function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [viewingUser, setViewingUser] = useState<UserRecord | null>(null);
 
   const {
     register,
@@ -189,7 +193,7 @@ export function AdminUsersPage() {
     }
   };
 
-  const handleSubmit = (data: any) => {
+  const handleFilterSubmit = (data: any) => {
     setPage(1);
   };
 
@@ -202,14 +206,14 @@ export function AdminUsersPage() {
           <p className="text-gray-600 mt-1">Manage system users and their roles</p>
         </div>
         <button onClick={() => setShowCreateModal(true)} className="btn-primary">
-          <UserPlus className="w-4 h-4 mr-2" />
+          <UserIcon className="w-4 h-4 mr-2" />
           Add User
         </button>
       </div>
 
       {/* Filters */}
       <div className="card p-4">
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="label">Search</label>
             <div className="relative mt-1">
@@ -221,7 +225,7 @@ export function AdminUsersPage() {
             <label className="label">Role</label>
             <select {...register('role')} className="input">
               <option value="">All Roles</option>
-              {Object.values(UserRole).map(r => (
+              {userRoles.map(r => (
                 <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
               ))}
             </select>
@@ -230,7 +234,7 @@ export function AdminUsersPage() {
             <label className="label">Status</label>
             <select {...register('status')} className="input">
               <option value="">All Statuses</option>
-              {Object.values(UserStatus).map(s => (
+              {userStatuses.map(s => (
                 <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
               ))}
             </select>
@@ -303,9 +307,9 @@ export function AdminUsersPage() {
                         <td>
                           <div className="flex items-center gap-2">
                             {user.totp_enabled ? (
-                              <BadgeCheck className="w-4 h-4 text-success-600" title="MFA Enabled" />
+                              <BadgeCheck className="w-4 h-4 text-success-600" aria-label="MFA Enabled" />
                             ) : (
-                              <AlertTriangle className="w-4 h-4 text-warning-600" title="MFA Disabled" />
+                              <AlertTriangle className="w-4 h-4 text-warning-600" aria-label="MFA Disabled" />
                             )}
                           </div>
                         </td>

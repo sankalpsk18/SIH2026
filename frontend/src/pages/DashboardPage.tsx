@@ -10,7 +10,7 @@ import {
   FileText,
   ShieldCheck,
   Search,
-  Timeline,
+  History,
   GitBranch,
   FileSignature,
   ClipboardList,
@@ -22,8 +22,8 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
-import { casesApi, documentsApi, evidenceApi, searchApi, timelineApi, bsaApi, auditApi, rtiApi } from '../../services/api';
-import { Case, Document, Evidence, CaseStats } from '../../types';
+import { casesApi, documentsApi, evidenceApi, searchApi, timelineApi, bsaApi, auditApi, rtiApi } from '../services/api';
+import { Case, Document, Evidence, CaseStats } from '../types';
 
 interface StatCard {
   title: string;
@@ -68,34 +68,43 @@ export function DashboardPage() {
         ]);
       }
 
-      const searchRes = await searchApi.search({ query: '', page: 1, limit: 5 }).catch(() => ({ status: 'rejected' }));
+      const [searchRes] = await Promise.allSettled([
+        searchApi.search({ query: '', page: 1, limit: 5 }),
+      ]);
 
-      // Build stats
+      // Build stats - safely handle API response structure
+      const getTotal = (res: any) => {
+        if (res.status === 'fulfilled' && res.value?.data) {
+          return res.value.data.total || 0;
+        }
+        return 0;
+      };
+
       const statCards: StatCard[] = [
         {
           title: 'Active Cases',
-          value: casesRes.data.total || 0,
+          value: casesRes.data?.total || 0,
           icon: <FolderKanban className="w-6 h-6" />,
           color: 'bg-blue-500',
           href: '/cases',
         },
         {
           title: 'Documents',
-          value: docsRes.status === 'fulfilled' ? docsRes.value.data.total || 0 : 0,
+          value: getTotal(docsRes),
           icon: <FileText className="w-6 h-6" />,
           color: 'bg-green-500',
           href: '/documents',
         },
         {
           title: 'Evidence Items',
-          value: eviRes.status === 'fulfilled' ? eviRes.value.data.total || 0 : 0,
+          value: getTotal(eviRes),
           icon: <ShieldCheck className="w-6 h-6" />,
           color: 'bg-purple-500',
           href: '/evidence',
         },
         {
           title: 'Search Index',
-          value: searchRes.status === 'fulfilled' ? searchRes.value.data.total || 0 : 0,
+          value: getTotal(searchRes),
           icon: <Search className="w-6 h-6" />,
           color: 'bg-orange-500',
           href: '/search',
@@ -103,7 +112,8 @@ export function DashboardPage() {
       ];
       setStats(statCards);
     } catch (err) {
-      setError('Failed to load dashboard data');
+      console.error('Dashboard load error:', err);
+      setError('Failed to load some dashboard data. Please check your connection.');
     } finally {
       setIsLoading(false);
     }

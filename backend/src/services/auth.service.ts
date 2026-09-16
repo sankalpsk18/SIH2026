@@ -427,7 +427,8 @@ export async function login(request: LoginRequest, ipAddress?: string, userAgent
         ipAddress,
         userAgent,
         deviceFingerprint,
-        user.totp_enabled // MFA verified if TOTP enabled and we got here
+        user.totp_enabled, // MFA verified if TOTP enabled and we got here
+        sessionId // Pass the session ID to match the token
     );
 
     await updateUserLastLogin(user.id);
@@ -536,7 +537,8 @@ export async function verifyMfa(
         ipAddress,
         userAgent,
         undefined,
-        true
+        true,
+        sessionId // Pass the session ID to match the token
     );
 
     await updateUserLastLogin(user.id);
@@ -985,3 +987,28 @@ export async function assessLoginRisk(
         user.role
     );
 }
+
+// Route modules consume authentication operations through this service facade.
+export const authService = {
+    login,
+    verifyMfa,
+    refreshToken,
+    logout,
+    logoutAllDevices,
+    setupMfaForUser,
+    enableMfa,
+    disableMfa,
+    regenerateBackupCodes,
+    changePassword,
+    requestPasswordReset,
+    resetPassword,
+    registerUser,
+    updateProfile,
+    getProfile,
+    getCurrentSessions,
+    revokeSession,
+    revokeAllSessions,
+    trustCurrentDevice,
+    checkDeviceTrust,
+    assessLoginRisk,
+};

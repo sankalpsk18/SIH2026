@@ -17,7 +17,7 @@ import {
   Clock,
   FileText,
   ShieldCheck,
-  Timeline,
+  History,
   GitBranch,
   FileSignature,
   Users,
@@ -27,8 +27,8 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import { documentsApi } from '../../services/api';
-import { Document, DocumentVersion, DocumentType, DocumentStatus } from '../../types';
+import { documentsApi } from '../services/api';
+import { Document, DocumentVersion, DocumentType, DocumentStatus } from '../types';
 import { toast } from 'react-hot-toast';
 
 export function DocumentDetailPage() {
@@ -68,13 +68,13 @@ export function DocumentDetailPage() {
       const response = await documentsApi.download(document.id);
       const blob = response.data;
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.original_filename;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
     } catch (error: any) {
       toast.error('Failed to download document');
     }
@@ -116,7 +116,7 @@ export function DocumentDetailPage() {
     { id: 'versions', label: 'Versions', icon: <Clock className="w-4 h-4" /> },
     { id: 'ocr', label: 'OCR Text', icon: <FileText className="w-4 h-4" /> },
     { id: 'entities', label: 'Entities', icon: <ShieldCheck className="w-4 h-4" /> },
-    { id: 'custody', label: 'Custody', icon: <Timeline className="w-4 h-4" /> },
+    { id: 'custody', label: 'Custody', icon: <History className="w-4 h-4" /> },
   ];
 
   return (
@@ -209,13 +209,13 @@ function DetailsTab({ document }: { document: Document }) {
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">File Information</h3>
           <dl className="space-y-4">
             <DetailItem label="Original Filename" value={document.original_filename} />
-            <DetailItem label="Stored Filename" value={document.stored_filename} />
+            <DetailItem label="Stored Filename" value={document.stored_filename || '—'} />
             <DetailItem label="MIME Type" value={document.mime_type} />
             <DetailItem label="File Size" value={formatBytes(document.file_size_bytes)} />
             <DetailItem label="SHA-256 Hash" value={document.file_hash_sha256} />
-            <DetailItem label="Encryption Algorithm" value={document.encryption_algorithm} />
-            <DetailItem label="Storage Path" value={document.storage_path} />
-            <DetailItem label="Storage Bucket" value={document.storage_bucket} />
+            <DetailItem label="Encryption Algorithm" value={document.encryption_algorithm || '—'} />
+            <DetailItem label="Storage Path" value={document.storage_path || '—'} />
+            <DetailItem label="Storage Bucket" value={document.storage_bucket || '—'} />
           </dl>
         </div>
       </div>
@@ -320,7 +320,7 @@ function OcrTab({ document }: { document: Document }) {
 }
 
 function EntitiesTab({ document }: { document: Document }) {
-  const entities = document.extracted_entities || {};
+  const entities: Record<string, string[]> = document.extracted_entities || {};
 
   return (
     <div className="space-y-6">

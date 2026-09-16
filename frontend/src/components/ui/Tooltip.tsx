@@ -14,9 +14,9 @@ interface TooltipProps {
 
 export function Tooltip({ content, children, position = 'top', delay = 200, className = '' }: TooltipProps) {
   const [visible, setVisible] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const childRef = useRef<HTMLElement>(null);
+  const childRef = useRef<HTMLDivElement>(null);
 
   const showTooltip = () => {
     timeoutRef.current = setTimeout(() => setVisible(true), delay);
@@ -56,7 +56,7 @@ export function Tooltip({ content, children, position = 'top', delay = 200, clas
       onFocus={showTooltip}
       onBlur={hideTooltip}
     >
-      {React.cloneElement(children as React.ReactElement, { ref: childRef })}
+      {children}
       {visible && (
         <div
           ref={tooltipRef}

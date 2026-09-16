@@ -49,7 +49,7 @@ export function Pagination({
           <select
             id="page-size"
             value={itemsPerPage}
-            onChange={(e) => onPageChange(1)} // Reset to page 1 when page size changes
+            onChange={(e) => onPageChange(1)}
             className="input w-auto"
           >
             {pageSizeOptions.map((size) => (

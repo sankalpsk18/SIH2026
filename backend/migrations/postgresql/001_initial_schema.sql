@@ -247,7 +247,7 @@ CREATE TABLE case_assignments (
     case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role_in_case VARCHAR(100) NOT NULL,
-    permission_level permission_level[] DEFAULT ARRAY['READ'],
+    permission_level permission_level[] DEFAULT ARRAY['READ']::permission_level[],
     assigned_at TIMESTAMPTZ DEFAULT NOW(),
     assigned_by UUID REFERENCES users(id),
     revoked_at TIMESTAMPTZ,

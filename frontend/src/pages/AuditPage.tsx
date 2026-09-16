@@ -28,9 +28,10 @@ import {
   XCircle,
   MinusCircle,
 } from 'lucide-react';
-import { auditApi } from '../../services/api';
-import { AuditEvent } from '../../types';
+import { auditApi } from '../services/api';
+import { AuditEvent } from '../types';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const auditQuerySchema = z.object({
   user_id: z.string().uuid().optional(),
@@ -51,6 +52,7 @@ const auditQuerySchema = z.object({
 type AuditQueryFormData = z.infer<typeof auditQuerySchema>;
 
 export function AuditPage() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -62,6 +64,7 @@ export function AuditPage() {
   const [showComplianceReport, setShowComplianceReport] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const {
     register,
@@ -86,6 +89,7 @@ export function AuditPage() {
 
   const loadEvents = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const params = {
         page,
@@ -103,11 +107,15 @@ export function AuditPage() {
         correlation_id: watch('correlation_id') || undefined,
       };
       const response = await auditApi.query(params);
-      setEvents(response.data.events);
-      setTotal(response.data.total);
-      setTotalPages(response.data.totalPages);
+      // Handle different response structures
+      const data = response.data;
+      setEvents(data.events || data || []);
+      setTotal(data.total || data.length || 0);
+      setTotalPages(data.totalPages || Math.ceil((data.total || data.length || 0) / limit));
     } catch (error: any) {
-      toast.error('Failed to load audit logs');
+      const message = error.response?.data?.message || 'Failed to load audit logs';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -157,6 +165,9 @@ export function AuditPage() {
     setSelectedEvent(event);
   };
 
+  // Check if user has permission (AUDITOR or CENTRAL_ADMIN)
+  const hasPermission = user && ['CENTRAL_ADMIN', 'AUDITOR'].includes(user.role);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -176,6 +187,93 @@ export function AuditPage() {
           </button>
         </div>
       </div>
+
+      {/* Permission Check */}
+      {!hasPermission && (
+        <div className="card p-8 text-center bg-danger-50 border-danger-200">
+          <div className="w-16 h-16 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-danger-600" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
+          <p className="text-gray-600 mb-4">
+            You need <strong>Auditor</strong> or <strong>Central Admin</strong> role to view audit logs.
+            Current role: {user?.role || 'Unknown'}
+          </p>
+          <button onClick={() => window.history.back()} className="btn-secondary">
+            Go Back
+          </button>
+        </div>
+      )}
+
+      {hasPermission && error && (
+        <div className="card p-6 bg-danger-50 border-danger-200">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-6 h-6 text-danger-600 flex-shrink-0" />
+            <div className="flex-1 text-left">
+              <h3 className="font-medium text-gray-900">Error Loading Audit Logs</h3>
+              <p className="text-sm text-gray-600 mt-1">{error}</p>
+            </div>
+            <button onClick={loadEvents} className="btn-primary btn-sm">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasPermission && !error && (
+        <>
+          {/* Filters */}
+          <div className="card p-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <label className="label">Start Date</label>
+                <input {...register('start_date')} type="date" className="input" />
+              </div>
+              <div>
+                <label className="label">End Date</label>
+                <input {...register('end_date')} type="date" className="input" />
+              </div>
+              <div>
+                <label className="label">User ID</label>
+                <input {...register('user_id')} type="text" placeholder="Filter by user" className="input" />
+              </div>
+              <div>
+                <label className="label">Event Type</label>
+                <input {...register('event_type')} type="text" placeholder="e.g., LOGIN_SUCCESS" className="input" />
+              </div>
+              <div>
+                <label className="label">Category</label>
+                <select {...register('event_category')} className="input">
+                  <option value="">All Categories</option>
+                  <option value="AUTHENTICATION">Authentication</option>
+                  <option value="AUTHORIZATION">Authorization</option>
+                  <option value="DOCUMENT_MANAGEMENT">Document Management</option>
+                  <option value="EVIDENCE_MANAGEMENT">Evidence Management</option>
+                  <option value="BLOCKCHAIN">Blockchain</option>
+                  <option value="SECURITY">Security</option>
+                  <option value="AUDIT">Audit</option>
+                  <option value="VALIDATION">Validation</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Resource Type</label>
+                <input {...register('resource_type')} type="text" placeholder="e.g., CASE, DOCUMENT" className="input" />
+              </div>
+              <div>
+                <label className="label">Action</label>
+                <input {...register('action')} type="text" placeholder="e.g., create_case" className="input" />
+              </div>
+              <div>
+                <label className="label">Outcome</label>
+                <select {...register('outcome')} className="input">
+                  <option value="">All Outcomes</option>
+                  <option value="SUCCESS">Success</option>
+                  <option value="FAILURE">Failure</option>
+                  <option value="DENIED">Denied</option>
+                  <option value="ERROR">Error</option>
+                  <option value="PARTIAL">Partial</option>
+                </select>
+              </div>
 
       {/* Filters */}
       <div className="card p-4">

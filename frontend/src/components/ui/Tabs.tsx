@@ -80,7 +80,7 @@ export function TabPanels({ tabs, activeTab, children }: { tabs: Tab[]; activeTa
   const activeTabObj = tabs.find(t => t.id === activeTab);
   return (
     <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`} hidden={!activeTabObj}>
-      {typeof children === 'function' ? children(activeTab) : children}
+      {activeTabObj ? children : null}
     </div>
   );
 }

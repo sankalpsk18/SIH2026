@@ -143,6 +143,12 @@ export const authApi = {
   changePassword: (data: { current_password: string; new_password: string; confirm_password: string }) =>
     api.post('/auth/change-password', data),
 
+  forgotPassword: (data: { email: string }) =>
+    api.post('/auth/forgot-password', data),
+
+  resetPassword: (data: { token: string; new_password: string; confirm_password: string }) =>
+    api.post('/auth/reset-password', data),
+
   // MFA
   setupMfa: () => api.post('/auth/mfa/setup'),
   enableMfa: (code: string) => api.post('/auth/mfa/enable', { verification_code: code }),
@@ -171,6 +177,8 @@ export const casesApi = {
     status?: string;
     priority?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get('/cases', { params }),
 
   get: (caseId: string) => api.get(`/cases/${caseId}`),
@@ -214,6 +222,8 @@ export const documentsApi = {
     documentType?: string;
     status?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get(`/documents/case/${caseId}`, { params }),
 
   get: (documentId: string) => api.get(`/documents/${documentId}`),
@@ -274,6 +284,8 @@ export const evidenceApi = {
     evidenceType?: string;
     status?: string;
     search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
   }) => api.get(`/evidence/case/${caseId}`, { params }),
 
   get: (evidenceId: string) => api.get(`/evidence/${evidenceId}`),

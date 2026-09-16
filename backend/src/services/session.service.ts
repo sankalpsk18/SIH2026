@@ -86,15 +86,16 @@ export async function createSession(
     ipAddress?: string,
     userAgent?: string,
     deviceFingerprint?: string,
-    mfaVerified: boolean = false
+    mfaVerified: boolean = false,
+    sessionId?: string
 ): Promise<SessionData> {
     const redis = getRedisClient();
-    const sessionId = uuidv4();
+    const newSessionId = sessionId || uuidv4();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
 
     const session: SessionData = {
-        session_id: sessionId,
+        session_id: newSessionId,
         user_id: userId,
         email,
         role,
@@ -113,7 +114,7 @@ export async function createSession(
 
     // Store session
     await redis.setex(
-        KEYS.session(sessionId),
+        KEYS.session(newSessionId),
         SESSION_TTL_SECONDS,
         JSON.stringify(session)
     );
@@ -122,7 +123,7 @@ export async function createSession(
     await redis.zadd(
         KEYS.userSessions(userId),
         now.getTime(),
-        sessionId
+        newSessionId
     );
 
     // Enforce concurrent session limit
