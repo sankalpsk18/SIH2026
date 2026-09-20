@@ -13,7 +13,7 @@ import { UserRole, PermissionLevel } from '@types/database.js';
 
 const router = Router();
 
-// All routes require authentication
+// All certificate management routes require authentication.
 router.use(authenticate);
 
 // ============================================================================
@@ -84,7 +84,7 @@ const revokeCertificateSchema = z.object({
 // ============================================================================
 
 router.post('/generate',
-    requireRole(UserRole.PROSECUTOR, UserRole.COURT, UserRole.CENTRAL_ADMIN),
+    requireRole(UserRole.CENTRAL_ADMIN),
     userRateLimit(10, 3600000, 'bsa_generate'), // 10 per hour
     validate(generateCertificateSchema),
     async (req, res, next) => {
@@ -144,6 +144,7 @@ router.post('/generate',
 // ============================================================================
 
 router.get('/verify/:certificateNumber',
+    requireRole(UserRole.CENTRAL_ADMIN),
     validate(certificateNumberParamSchema),
     async (req, res, next) => {
         try {

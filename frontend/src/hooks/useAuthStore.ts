@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { User } from '../types';
+import { authApi } from '../services/api';
 
 interface AuthState {
   user: User | null;
@@ -23,7 +24,7 @@ interface AuthState {
   setMfaToken: (token?: string) => void;
   setLoading: (loading: boolean) => void;
   clearAuth: () => void;
-  hydrate: () => void;
+  hydrate: () => Promise<void>;
 }
 
 const initialState = {
@@ -72,12 +73,39 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      hydrate: () => {
+      hydrate: async () => {
         const { accessToken, refreshToken, user, isAuthenticated } = get();
-        if (accessToken && refreshToken && user && isAuthenticated) {
-          set({ isLoading: false });
-        } else {
+
+        // If no stored auth data, clear and return
+        if (!accessToken || !refreshToken || !user || !isAuthenticated) {
           set({ ...initialState, isLoading: false });
+          return;
+        }
+
+        // Validate token by fetching user profile
+        try {
+          const response = await authApi.getProfile();
+          set({
+            user: response.data,
+            isAuthenticated: true,
+            isLoading: false
+          });
+        } catch (error) {
+          // Token invalid/expired - try to refresh
+          try {
+            const response = await authApi.refresh(refreshToken);
+            const { access_token, refresh_token, user: freshUser } = response.data;
+            set({
+              accessToken: access_token,
+              refreshToken: refresh_token,
+              user: freshUser,
+              isAuthenticated: true,
+              isLoading: false
+            });
+          } catch (refreshError) {
+            // Refresh failed - clear auth
+            set({ ...initialState, isLoading: false });
+          }
         }
       },
     }),

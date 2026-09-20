@@ -274,78 +274,25 @@ export function AuditPage() {
                   <option value="PARTIAL">Partial</option>
                 </select>
               </div>
-
-      {/* Filters */}
-      <div className="card p-4">
-        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
-            <label className="label">Start Date</label>
-            <input {...register('start_date')} type="date" className="input" />
+              <div>
+                <label className="label">Severity</label>
+                <select {...register('severity')} className="input">
+                  <option value="">All Severities</option>
+                  <option value="DEBUG">Debug</option>
+                  <option value="INFO">Info</option>
+                  <option value="WARNING">Warning</option>
+                  <option value="ERROR">Error</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div className="lg:col-span-1 flex items-end">
+                <button type="submit" className="btn-primary w-full">
+                  <Search className="w-4 h-4 mr-2" />
+                  Filter
+                </button>
+              </div>
+            </form>
           </div>
-          <div>
-            <label className="label">End Date</label>
-            <input {...register('end_date')} type="date" className="input" />
-          </div>
-          <div>
-            <label className="label">User ID</label>
-            <input {...register('user_id')} type="text" placeholder="Filter by user" className="input" />
-          </div>
-          <div>
-            <label className="label">Event Type</label>
-            <input {...register('event_type')} type="text" placeholder="e.g., LOGIN_SUCCESS" className="input" />
-          </div>
-          <div>
-            <label className="label">Category</label>
-            <select {...register('event_category')} className="input">
-              <option value="">All Categories</option>
-              <option value="AUTHENTICATION">Authentication</option>
-              <option value="AUTHORIZATION">Authorization</option>
-              <option value="DOCUMENT_MANAGEMENT">Document Management</option>
-              <option value="EVIDENCE_MANAGEMENT">Evidence Management</option>
-              <option value="BLOCKCHAIN">Blockchain</option>
-              <option value="SECURITY">Security</option>
-              <option value="AUDIT">Audit</option>
-              <option value="VALIDATION">Validation</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Resource Type</label>
-            <input {...register('resource_type')} type="text" placeholder="e.g., CASE, DOCUMENT" className="input" />
-          </div>
-          <div>
-            <label className="label">Action</label>
-            <input {...register('action')} type="text" placeholder="e.g., create_case" className="input" />
-          </div>
-          <div>
-            <label className="label">Outcome</label>
-            <select {...register('outcome')} className="input">
-              <option value="">All Outcomes</option>
-              <option value="SUCCESS">Success</option>
-              <option value="FAILURE">Failure</option>
-              <option value="DENIED">Denied</option>
-              <option value="ERROR">Error</option>
-              <option value="PARTIAL">Partial</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">Severity</label>
-            <select {...register('severity')} className="input">
-              <option value="">All Severities</option>
-              <option value="DEBUG">Debug</option>
-              <option value="INFO">Info</option>
-              <option value="WARNING">Warning</option>
-              <option value="ERROR">Error</option>
-              <option value="CRITICAL">Critical</option>
-            </select>
-          </div>
-          <div className="lg:col-span-1 flex items-end">
-            <button type="submit" className="btn-primary w-full">
-              <Search className="w-4 h-4 mr-2" />
-              Filter
-            </button>
-          </div>
-        </form>
-      </div>
 
       {/* Events Table */}
       <div className="card overflow-hidden">
@@ -354,7 +301,7 @@ export function AuditPage() {
             <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
           </div>
         ) : (
-          <>
+          <div>
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
@@ -445,9 +392,11 @@ export function AuditPage() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
+  </>
+)}
     </div>
   );
 }

@@ -29,8 +29,10 @@ const lazyPage = (importer: () => Promise<any>, exportName?: string) =>
 
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'), 'DashboardPage');
 const CasesPage = lazyPage(() => import('./pages/CasesPage'), 'CasesPage');
+const NewCasePage = lazyPage(() => import('./pages/NewCasePage'), 'NewCasePage');
 const CaseDetailPage = lazyPage(() => import('./pages/CaseDetailPage'), 'CaseDetailPage');
 const DocumentsPage = lazyPage(() => import('./pages/DocumentsPage'), 'DocumentsPage');
+const DocumentUploadPage = lazyPage(() => import('./pages/DocumentUploadPage'), 'DocumentUploadPage');
 const DocumentDetailPage = lazyPage(() => import('./pages/DocumentDetailPage'), 'DocumentDetailPage');
 const EvidencePage = lazyPage(() => import('./pages/EvidencePage'), 'EvidencePage');
 const EvidenceDetailPage = lazyPage(() => import('./pages/EvidenceDetailPage'), 'EvidenceDetailPage');
@@ -38,6 +40,7 @@ const SearchPage = lazyPage(() => import('./pages/SearchPage'), 'SearchPage');
 const TimelinePage = lazyPage(() => import('./pages/TimelinePage'), 'TimelinePage');
 const EntityGraphPage = lazyPage(() => import('./pages/EntityGraphPage'), 'EntityGraphPage');
 const BsaCertificatePage = lazyPage(() => import('./pages/BsaCertificatePage'), 'BsaCertificatePage');
+const CertificateVerificationPage = lazyPage(() => import('./pages/CertificateVerificationPage'), 'CertificateVerificationPage');
 const AuditPage = lazyPage(() => import('./pages/AuditPage'), 'AuditPage');
 const AdminUsersPage = lazyPage(() => import('./pages/admin/AdminUsersPage'), 'AdminUsersPage');
 const AdminConfigPage = lazyPage(() => import('./pages/admin/AdminConfigPage'), 'AdminConfigPage');
@@ -84,7 +87,8 @@ function ProtectedRoute({ children, allowedRoles, requiredPermission }: Protecte
     }
   }
 
-  return <>{children}</>;
+  // Return children directly (not wrapped in fragment) to ensure Outlet works correctly
+  return children;
 }
 
 function App() {
@@ -102,6 +106,8 @@ function App() {
         <Route path="/mfa/verify" element={!isAuthenticated ? <MfaVerifyPage /> : <Navigate to="/" replace />} />
         <Route path="/forgot-password" element={!isAuthenticated ? <ForgotPasswordPage /> : <Navigate to="/" replace />} />
         <Route path="/reset-password" element={!isAuthenticated ? <ResetPasswordPage /> : <Navigate to="/" replace />} />
+        <Route path="/verify" element={<CertificateVerificationPage />} />
+        <Route path="/verify/*" element={<CertificateVerificationPage />} />
 
         {/* Protected routes */}
         <Route
@@ -117,11 +123,13 @@ function App() {
 
           {/* Cases */}
           <Route path="cases" element={<CasesPage />} />
+          <Route path="cases/new" element={<ProtectedRoute allowedRoles={['CENTRAL_ADMIN', 'INVESTIGATING_OFFICER']}><NewCasePage /></ProtectedRoute>} />
           <Route path="cases/:caseId" element={<CaseDetailPage />} />
 
           {/* Documents */}
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="cases/:caseId/documents" element={<DocumentsPage />} />
+          <Route path="documents/upload" element={<DocumentUploadPage />} />
           <Route path="documents/:documentId" element={<DocumentDetailPage />} />
 
           {/* Evidence */}
@@ -139,8 +147,8 @@ function App() {
           <Route path="cases/:caseId/entity-graph" element={<EntityGraphPage />} />
 
           {/* BSA Certificates */}
-          <Route path="bsa" element={<BsaCertificatePage />} />
-          <Route path="bsa/:certificateId" element={<BsaCertificatePage />} />
+          <Route path="bsa" element={<ProtectedRoute allowedRoles={['CENTRAL_ADMIN']}><BsaCertificatePage /></ProtectedRoute>} />
+          <Route path="bsa/:certificateId" element={<ProtectedRoute allowedRoles={['CENTRAL_ADMIN']}><BsaCertificatePage /></ProtectedRoute>} />
 
           {/* RTI */}
           <Route path="rti" element={<RtiPage />} />

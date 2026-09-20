@@ -32,6 +32,7 @@ import {
 import { casesApi } from '../services/api';
 import { Case, CaseStatus, CasePriority } from '../types';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const caseStatuses: CaseStatus[] = ['OPEN', 'UNDER_INVESTIGATION', 'CHARGE_SHEET_FILED', 'TRIAL_IN_PROGRESS', 'JUDGMENT_RESERVED', 'DISPOSED', 'APPEALED', 'CLOSED'];
 const casePriorities: CasePriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -49,6 +50,7 @@ const filterSchema = z.object({
 type FilterFormData = z.infer<typeof filterSchema>;
 
 export function CasesPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [cases, setCases] = useState<Case[]>([]);
@@ -61,6 +63,7 @@ export function CasesPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const {
     register,
@@ -162,10 +165,7 @@ export function CasesPage() {
             <Filter className="w-4 h-4 mr-2" />
             Filters
           </button>
-          <Link to="/cases/new" className="btn-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            New Case
-          </Link>
+          {(user?.role === 'CENTRAL_ADMIN' || user?.role === 'INVESTIGATING_OFFICER') && <Link to="/cases/new" className="btn-primary"><Plus className="w-4 h-4 mr-2" />New Case</Link>}
         </div>
       </div>
 
@@ -214,7 +214,15 @@ export function CasesPage() {
       )}
 
       {/* Cases Table */}
-      <div className="card overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {cases.map(caseItem => (
+          <Link key={caseItem.id} to={`/cases/${caseItem.id}`} className={`card-hover overflow-hidden border-l-4 ${getPriorityBorderColor(caseItem.priority)}`}>
+            <div className="p-4 border-b border-gray-100"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs font-bold text-primary-700">{caseItem.case_number}</p><p className="text-sm text-gray-600 mt-1 line-clamp-2">{caseItem.title}</p></div><span className={`badge ${getPriorityBadgeColor(caseItem.priority)}`}>{caseItem.priority}</span></div></div>
+            <div className="p-4 space-y-2 text-xs"><div className="flex justify-between"><span className="text-gray-500">Status</span><span className="font-semibold text-gray-900">{formatStatus(caseItem.status)}</span></div><div className="flex justify-between"><span className="text-gray-500">Department</span><span className="font-semibold text-gray-900">{caseItem.police_station || caseItem.district || 'Assigned'}</span></div><div className="flex justify-between"><span className="text-gray-500">Last Activity</span><span className="font-semibold text-gray-900">{new Date(caseItem.updated_at || caseItem.created_at).toLocaleDateString()}</span></div></div>
+          </Link>
+        ))}
+      </div>
+      <div className="hidden card overflow-hidden">
         {isLoading && cases.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
@@ -260,7 +268,7 @@ export function CasesPage() {
                       <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                         <FolderKanban className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-gray-500">No cases found</p>
-                        <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or create a new case</p>
+                        <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or review your assigned cases</p>
                       </td>
                     </tr>
                   ) : (
@@ -326,10 +334,15 @@ export function CasesPage() {
                               <History className="w-4 h-4" />
                             </Link>
                             <div className="relative">
-                              <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
+                              <button
+                                className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                                onClick={() => setOpenMenuId(openMenuId === caseItem.id ? null : caseItem.id)}
+                                aria-label={`More actions for ${caseItem.case_number}`}
+                                aria-expanded={openMenuId === caseItem.id}
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
-                              <div className="dropdown-menu">
+                              {openMenuId === caseItem.id && <div className="dropdown-menu">
                                 <Link to={`/cases/${caseItem.id}/entity-graph`} className="dropdown-item">
                                   <GitBranch className="w-4 h-4" />
                                   Entity Graph
@@ -340,13 +353,13 @@ export function CasesPage() {
                                 </Link>
                                 <hr className="my-1 border-gray-100" />
                                 <button
-                                  onClick={() => handleDelete(caseItem.id)}
+                                  onClick={() => { setOpenMenuId(null); handleDelete(caseItem.id); }}
                                   className="dropdown-item text-danger-600"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                   Delete Case
                                 </button>
-                              </div>
+                              </div>}
                             </div>
                           </div>
                         </td>
@@ -417,4 +430,9 @@ function getPriorityBadgeColor(priority: string): string {
     CRITICAL: 'badge-red',
   };
   return colors[priority] || 'badge-gray';
+}
+
+function getPriorityBorderColor(priority: string): string {
+  const colors: Record<string, string> = { LOW: 'border-success-500', MEDIUM: 'border-warning-500', HIGH: 'border-danger-500', CRITICAL: 'border-danger-700' };
+  return colors[priority] || 'border-secondary-300';
 }

@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success(`Welcome back, ${data.user.full_name}!`);
       return { requiresMfa: false };
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed';
+      const message = error.response?.data?.message || error.message || 'Login failed';
       toast.error(message);
       throw error;
     }

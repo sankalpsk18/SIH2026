@@ -20,6 +20,9 @@ import collaborationRoutes from './collaboration.routes.js';
 import assetLifecycleRoutes from './asset-lifecycle.routes.js';
 import pkiRoutes from './pki.routes.js';
 import { config } from '@config/index.js';
+import { getBsaCertificateService } from '@intelligence/bsa-certificate/bsa-certificate.service.js';
+import { authenticate, requireRole } from '@middleware/auth/auth.middleware.js';
+import { UserRole } from '@types/database.js';
 
 const router = Router();
 
@@ -32,8 +35,21 @@ const apiPrefix = config.server.apiPrefix;
 // Auth routes (login, refresh, etc. - handled internally)
 router.use(`${apiPrefix}/auth`, authRoutes);
 
-// BSA certificate verification (public endpoint)
-router.use(`${apiPrefix}/bsa/verify`, bsaRoutes);
+// BSA certificate verification (public endpoint). Query parameters are used
+// because certificate numbers contain slash characters.
+router.get(`${apiPrefix}/bsa/verify`, authenticate, requireRole(UserRole.CENTRAL_ADMIN), async (req, res, next) => {
+    try {
+        const certificateNumber = String(req.query.certificateNumber || '').trim();
+        if (!certificateNumber) {
+            res.status(400).json({ error: 'VALIDATION_ERROR', message: 'certificateNumber is required' });
+            return;
+        }
+        const result = await getBsaCertificateService().verifyCertificate(certificateNumber);
+        res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
 
 // RTI request number lookup (public)
 router.get(`${apiPrefix}/rti/number/:requestNumber`, async (req, res, next) => {

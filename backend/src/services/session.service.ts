@@ -449,9 +449,12 @@ export async function consumePasswordResetToken(tokenHash: string): Promise<stri
 export async function sessionHealthCheck(): Promise<boolean> {
     try {
         const redis = getRedisClient();
-        await redis.ping();
+        console.log('[DEBUG] sessionHealthCheck: Redis client status:', redis.status);
+        const result = await redis.ping();
+        console.log('[DEBUG] sessionHealthCheck: Ping result:', result);
         return true;
-    } catch {
+    } catch (error) {
+        console.log('[DEBUG] sessionHealthCheck error:', error);
         return false;
     }
 }

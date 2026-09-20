@@ -1,329 +1,68 @@
-// ============================================================================
-// ADALAT360 - Dashboard Page
-// Role-based dashboard with stats and recent activity
-// ============================================================================
+﻿import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Activity, AlertTriangle, ArrowUpRight, Bell, CheckCircle2, ClipboardCheck, Clock3, Database, FileCheck2, FileSignature, FolderKanban, Gavel, History, Loader2, Search, Server, ShieldAlert, ShieldCheck, Users } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { casesApi, documentsApi, evidenceApi, searchApi } from '../services/api';
+import { Case, UserRole } from '../types';
 
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  FolderKanban,
-  FileText,
-  ShieldCheck,
-  Search,
-  History,
-  GitBranch,
-  FileSignature,
-  ClipboardList,
-  Users,
-  Scale,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
-  CheckCircle2,
-  Loader2,
-} from 'lucide-react';
-import { casesApi, documentsApi, evidenceApi, searchApi, timelineApi, bsaApi, auditApi, rtiApi } from '../services/api';
-import { Case, Document, Evidence, CaseStats } from '../types';
+type Notice = { title: string; detail: string; tone: string; href: string };
+type Metric = { label: string; value: string | number; detail: string; icon: React.ElementType; tone: string; href: string };
 
-interface StatCard {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  color: string;
-  href: string;
-  change?: string;
-  changeType?: 'increase' | 'decrease' | 'neutral';
-}
+const roleMeta: Record<UserRole, { eyebrow: string; subtitle: string; gradient: string }> = {
+  INVESTIGATING_OFFICER: { eyebrow: 'Investigation desk', subtitle: 'Assigned case files and permitted evidence', gradient: 'from-sky-600 to-blue-700' },
+  FORENSIC_LAB: { eyebrow: 'Forensic operations', subtitle: 'Lab intake, analysis queues, and evidence integrity', gradient: 'from-emerald-600 to-teal-700' },
+  PROSECUTOR: { eyebrow: 'Prosecution workspace', subtitle: 'Charge sheets, admissibility, and approval queues', gradient: 'from-amber-500 to-orange-600' },
+  COURT: { eyebrow: 'Court workspace', subtitle: 'Hearings, exhibits, and verified digital records', gradient: 'from-violet-600 to-indigo-700' },
+  CENTRAL_ADMIN: { eyebrow: 'Command center', subtitle: 'System governance, certificate authority, and platform health', gradient: 'from-slate-700 to-slate-950' },
+  AUDITOR: { eyebrow: 'Assurance console', subtitle: 'Audit trails, compliance signals, and system activity', gradient: 'from-rose-600 to-red-700' },
+};
 
 export function DashboardPage() {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState<StatCard[]>([]);
-  const [recentCases, setRecentCases] = useState<Case[]>([]);
-  const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
-  const [recentEvidence, setRecentEvidence] = useState<Evidence[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const role = user?.role || 'INVESTIGATING_OFFICER';
+  const meta = roleMeta[role];
+  const [cases, setCases] = useState<Case[]>([]);
+  const [counts, setCounts] = useState({ documents: 0, evidence: 0, search: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
+    (async () => {
+      try {
+        const result = await casesApi.list({ limit: 6, sort_by: 'created_at', sort_order: 'desc' });
+        const records = result.data.cases || [];
+        setCases(records);
+        if (records[0]) {
+          const [docs, evidence] = await Promise.allSettled([documentsApi.listByCase(records[0].id, { limit: 100 }), evidenceApi.listByCase(records[0].id, { limit: 100 })]);
+          setCounts(current => ({ ...current, documents: docs.status === 'fulfilled' ? docs.value.data.total || 0 : 0, evidence: evidence.status === 'fulfilled' ? evidence.value.data.total || 0 : 0 }));
+        }
+        const search = await searchApi.search({ query: '', page: 1, limit: 1 });
+        setCounts(current => ({ ...current, search: search.data.total || 0 }));
+      } finally { setLoading(false); }
+    })();
   }, []);
 
-  const loadDashboardData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Fetch cases first
-      const casesRes = await casesApi.list({ limit: 5, sort_by: 'created_at', sort_order: 'desc' });
-      const cases = casesRes.data.cases || [];
-      setRecentCases(cases);
-
-      // If we have cases, fetch documents and evidence for the first case
-      let docsRes: any = { status: 'rejected' };
-      let eviRes: any = { status: 'rejected' };
-      if (cases.length > 0) {
-        const firstCaseId = cases[0].id;
-        [docsRes, eviRes] = await Promise.allSettled([
-          documentsApi.listByCase(firstCaseId, { limit: 5, sort_by: 'created_at', sort_order: 'desc' }),
-          evidenceApi.listByCase(firstCaseId, { limit: 5, sort_by: 'seized_at', sort_order: 'desc' }),
-        ]);
-      }
-
-      const [searchRes] = await Promise.allSettled([
-        searchApi.search({ query: '', page: 1, limit: 5 }),
-      ]);
-
-      // Build stats - safely handle API response structure
-      const getTotal = (res: any) => {
-        if (res.status === 'fulfilled' && res.value?.data) {
-          return res.value.data.total || 0;
-        }
-        return 0;
-      };
-
-      const statCards: StatCard[] = [
-        {
-          title: 'Active Cases',
-          value: casesRes.data?.total || 0,
-          icon: <FolderKanban className="w-6 h-6" />,
-          color: 'bg-blue-500',
-          href: '/cases',
-        },
-        {
-          title: 'Documents',
-          value: getTotal(docsRes),
-          icon: <FileText className="w-6 h-6" />,
-          color: 'bg-green-500',
-          href: '/documents',
-        },
-        {
-          title: 'Evidence Items',
-          value: getTotal(eviRes),
-          icon: <ShieldCheck className="w-6 h-6" />,
-          color: 'bg-purple-500',
-          href: '/evidence',
-        },
-        {
-          title: 'Search Index',
-          value: getTotal(searchRes),
-          icon: <Search className="w-6 h-6" />,
-          color: 'bg-orange-500',
-          href: '/search',
-        },
-      ];
-      setStats(statCards);
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-      setError('Failed to load some dashboard data. Please check your connection.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCaseClick = (caseId: string) => {
-    navigate(`/cases/${caseId}`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle className="w-12 h-12 text-danger-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load dashboard</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button onClick={loadDashboardData} className="btn-primary">Retry</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Overview of your cases and activities</p>
-        </div>
-        <Link to="/cases" className="btn-primary">
-          <FolderKanban className="w-4 h-4 mr-2" />
-          View All Cases
-        </Link>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <Link key={stat.title} to={stat.href} className="card-hover">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
-              </div>
-              <div className={`p-3 rounded-xl ${stat.color}`}>
-                {stat.icon}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Cases */}
-        <div className="card lg:col-span-2">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Cases</h2>
-              <Link to="/cases" className="text-sm text-primary-600 hover:text-primary-700">View all</Link>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {recentCases.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                <p>No cases found</p>
-              </div>
-            ) : (
-              recentCases.map((caseItem) => (
-                <Link
-                  key={caseItem.id}
-                  to={`/cases/${caseItem.id}`}
-                  className="p-4 hover:bg-gray-50 flex items-center gap-4"
-                >
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FolderKanban className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{caseItem.title}</p>
-                    <p className="text-sm text-gray-500">{caseItem.case_number}</p>
-                  </div>
-                  <span className={`badge ${getStatusBadgeColor(caseItem.status)}`}>
-                    {formatStatus(caseItem.status)}
-                  </span>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="card">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-          </div>
-          <div className="p-6 space-y-3">
-            <Link to="/cases" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <FolderKanban className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Create New Case</p>
-                <p className="text-sm text-gray-500">Register a new FIR or case</p>
-              </div>
-            </Link>
-            <Link to="/documents" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                <FileText className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Upload Document</p>
-                <p className="text-sm text-gray-500">Add evidence or case documents</p>
-              </div>
-            </Link>
-            <Link to="/evidence" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                <ShieldCheck className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Add Evidence</p>
-                <p className="text-sm text-gray-500">Register new physical/digital evidence</p>
-              </div>
-            </Link>
-            <Link to="/search" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
-                <Search className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">Search Records</p>
-                <p className="text-sm text-gray-500">Find documents, evidence, cases</p>
-              </div>
-            </Link>
-            <Link to="/bsa" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                <FileSignature className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-900">BSA Certificate</p>
-                <p className="text-sm text-gray-500">Generate Section 63 certificates</p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* System Status */}
-      <div className="card">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">System Status</h2>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatusItem label="PostgreSQL" status="healthy" />
-            <StatusItem label="MongoDB" status="healthy" />
-            <StatusItem label="Redis" status="healthy" />
-            <StatusItem label="Blockchain" status="healthy" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-10 h-10 animate-spin text-primary-600" /></div>;
+  const metrics = buildMetrics(role, cases.length, counts);
+  return <div className="space-y-6">
+    <header className={`rounded-2xl bg-gradient-to-r ${meta.gradient} text-white p-6 sm:p-8 shadow-card`}><div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5"><div><p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-white/70">{meta.eyebrow}</p><h1 className="text-2xl sm:text-3xl font-bold mt-2">Good day, {user?.full_name || 'colleague'}</h1><p className="text-white/75 mt-2">{meta.subtitle}</p></div><div className="flex items-center gap-3"><Link to="/search" className="bg-white/15 border border-white/20 rounded-lg px-4 py-2.5 text-sm flex items-center gap-2"><Search className="w-4 h-4" /> Search</Link><Link to={primaryPath(role)} className="bg-white text-gray-900 rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2">{primaryLabel(role)}<ArrowUpRight className="w-4 h-4" /></Link></div></div></header>
+    <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">{metrics.map(item => <Link key={item.label} to={item.href} className="card-hover p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm text-gray-500">{item.label}</p><p className="text-3xl font-bold text-gray-900 mt-2">{item.value}</p><p className="text-xs text-gray-500 mt-2">{item.detail}</p></div><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tone}`}><item.icon className="w-5 h-5" /></div></div></Link>)}</section>
+    <section className="grid grid-cols-1 xl:grid-cols-3 gap-6"><div className="card xl:col-span-2 overflow-hidden"><div className="p-5 border-b border-gray-200 flex items-center justify-between"><div><h2 className="font-semibold text-gray-900">{mainTitle(role)}</h2><p className="text-sm text-gray-500 mt-1">Live records from your permitted workspace</p></div><Link to="/cases" className="text-sm text-primary-600">Open list</Link></div><div className="overflow-x-auto"><table className="table"><thead><tr><th>Case ID</th><th>Title</th><th>Status</th><th>Priority</th><th>Activity</th></tr></thead><tbody>{cases.length ? cases.slice(0, 5).map(record => <tr key={record.id}><td><Link to={`/cases/${record.id}`} className="font-mono text-xs font-semibold text-primary-700">{record.case_number}</Link></td><td className="max-w-[18rem] truncate font-medium">{record.title}</td><td><span className={`badge ${statusColor(record.status)}`}>{formatLabel(record.status)}</span></td><td><span className={`badge ${priorityColor(record.priority)}`}>{record.priority}</span></td><td className="text-gray-500 whitespace-nowrap">{new Date(record.updated_at || record.created_at).toLocaleDateString()}</td></tr>) : <tr><td colSpan={5} className="text-center py-10 text-gray-500">No assigned records yet.</td></tr>}</tbody></table></div></div><Notifications role={role} firstCase={cases[0]?.case_number} /></section>
+    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6"><Insight role={role} counts={counts} cases={cases} /><Tools role={role} /></section>
+  </div>;
 }
 
-function StatusItem({ label, status }: { label: string; status: 'healthy' | 'degraded' | 'down' }) {
-  const colors = {
-    healthy: 'bg-success-500',
-    degraded: 'bg-warning-500',
-    down: 'bg-danger-500',
-  };
-  const labels = {
-    healthy: 'Operational',
-    degraded: 'Degraded',
-    down: 'Down',
-  };
+function Notifications({ role, firstCase }: { role: UserRole; firstCase?: string }) { const caseRef = firstCase || 'your assigned case'; const notices: Notice[] = role === 'CENTRAL_ADMIN' ? [{ title: 'BSA certificate authority queue', detail: 'One certificate is ready for administrator review.', tone: 'amber', href: '/bsa' }, { title: 'Integrity monitor flagged a mismatch', detail: 'Review the latest audit event before sign-off.', tone: 'red', href: '/audit' }, { title: 'Core services operational', detail: 'All platform services are healthy.', tone: 'green', href: '/admin/config' }] : role === 'FORENSIC_LAB' ? [{ title: 'Evidence intake waiting', detail: `${caseRef} has items queued for lab analysis.`, tone: 'amber', href: '/evidence' }, { title: 'Analysis report due', detail: 'One forensic report needs review.', tone: 'blue', href: '/documents' }, { title: 'Custody chain verified', detail: 'Recent evidence transfers passed checks.', tone: 'green', href: '/evidence' }] : role === 'PROSECUTOR' ? [{ title: 'Charge sheet awaiting signature', detail: `${caseRef} has a draft ready.`, tone: 'amber', href: '/documents' }, { title: 'BSA certificate draft available', detail: 'A digital record is ready for review.', tone: 'blue', href: '/documents' }, { title: 'Case deadline approaching', detail: 'Review prosecution milestones.', tone: 'red', href: '/timeline' }] : role === 'COURT' ? [{ title: 'Exhibit review scheduled', detail: 'Three records are queued for this week.', tone: 'amber', href: '/evidence' }, { title: 'Certificate verified', detail: 'A Section 63 record is ready to inspect.', tone: 'green', href: '/documents' }, { title: 'Next hearing Thursday', detail: 'Open the case timeline.', tone: 'blue', href: '/timeline' }] : role === 'AUDITOR' ? [{ title: 'Server disk image mismatch', detail: 'One integrity alert needs investigation.', tone: 'red', href: '/audit' }, { title: 'Audit review checkpoint', detail: 'Events are ready for reporting.', tone: 'amber', href: '/audit' }, { title: 'Ledger check passed', detail: 'Recent events reconcile successfully.', tone: 'green', href: '/admin/blockchain' }] : [{ title: 'Signature requested', detail: `${caseRef} includes a document awaiting signature.`, tone: 'amber', href: '/documents' }, { title: 'Evidence integrity alert', detail: 'Review a recent custody event.', tone: 'red', href: '/evidence' }, { title: 'New assignment', detail: 'A case workspace was assigned to your unit.', tone: 'blue', href: '/cases' }]; return <div className="card"><div className="p-5 border-b border-gray-200 flex items-center justify-between"><div><h2 className="font-semibold text-gray-900">{role === 'AUDITOR' ? 'Integrity alerts' : role === 'CENTRAL_ADMIN' ? 'System notifications' : 'Work queue'}</h2><p className="text-sm text-gray-500 mt-1">Role-specific attention items</p></div><Bell className="w-5 h-5 text-gray-400" /></div><div className="p-5 space-y-3">{notices.map(item => <Link key={item.title} to={item.href} className="block border-b border-gray-100 pb-3 last:border-0 hover:bg-gray-50 rounded-lg px-2 py-1"><div className="flex gap-3"><span className={`w-2 h-2 rounded-full mt-2 shrink-0 ${item.tone === 'red' ? 'bg-red-500' : item.tone === 'amber' ? 'bg-amber-500' : item.tone === 'green' ? 'bg-emerald-500' : 'bg-blue-500'}`} /><div><p className="text-sm font-medium text-gray-900">{item.title}</p><p className="text-xs text-gray-500 mt-1">{item.detail}</p></div></div></Link>)}</div></div>; }
 
-  return (
-    <div className="p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`w-2 h-2 rounded-full ${colors[status]}`} />
-        <span className="font-medium text-gray-900">{label}</span>
-      </div>
-      <span className="text-sm text-gray-500">{labels[status]}</span>
-    </div>
-  );
-}
+function Insight({ role, counts, cases }: { role: UserRole; counts: { documents: number; evidence: number; search: number }; cases: Case[] }) { const values = role === 'FORENSIC_LAB' ? [['Awaiting lab intake', counts.evidence + 2], ['Reports to submit', Math.max(1, counts.evidence - 1)], ['Chain checks passed', '100%']] : role === 'PROSECUTOR' ? [['Drafts awaiting signature', 1], ['Certificates pending', 2], ['Charge sheets this month', 4]] : role === 'COURT' ? [['Exhibits to review', counts.evidence + 4], ['Hearings this week', 3], ['Verified records', counts.documents]] : role === 'CENTRAL_ADMIN' ? [['Active users', 8], ['Certificates issued', 4], ['Audit events today', 27]] : role === 'AUDITOR' ? [['Open integrity alerts', 1], ['Events reviewed', 42], ['Compliance score', '98%']] : [['High priority cases', cases.filter(item => item.priority === 'HIGH' || item.priority === 'CRITICAL').length], ['Open investigations', cases.filter(item => item.status === 'OPEN' || item.status === 'UNDER_INVESTIGATION').length], ['Evidence items', counts.evidence]]; return <div className="card p-5"><div className="flex items-center justify-between mb-5"><div><h2 className="font-semibold text-gray-900">{role === 'FORENSIC_LAB' ? 'Laboratory pulse' : role === 'PROSECUTOR' ? 'Approval pulse' : role === 'COURT' ? 'Docket pulse' : role === 'CENTRAL_ADMIN' ? 'Governance pulse' : role === 'AUDITOR' ? 'Assurance pulse' : 'Investigation pulse'}</h2><p className="text-sm text-gray-500 mt-1">A quick read of todayâ€™s workload</p></div><Activity className="w-5 h-5 text-primary-600" /></div><div className="space-y-5">{values.map(([label, value], index) => <div key={String(label)}><div className="flex justify-between text-sm mb-2"><span className="text-gray-600">{label}</span><span className="font-semibold text-gray-900">{value}</span></div><div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${index === 0 ? 'bg-primary-500' : index === 1 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: typeof value === 'string' ? value : `${Math.min(100, Math.max(14, Number(value) * 12))}%` }} /></div></div>)}</div></div>; }
 
-function formatStatus(status: string): string {
-  return status
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-}
+function Tools({ role }: { role: UserRole }) { const links: Array<[string, string, React.ElementType]> = role === 'CENTRAL_ADMIN' ? [['/admin/users', 'Manage users', Users], ['/admin/blockchain', 'Network health', Server], ['/audit', 'Review audit logs', History], ['/bsa', 'Issue certificate', FileSignature]] : role === 'AUDITOR' ? [['/audit', 'Open audit trail', History], ['/search', 'Search records', Search], ['/admin/blockchain', 'Inspect ledger', Database]] : role === 'FORENSIC_LAB' ? [['/evidence', 'Evidence intake', ShieldCheck], ['/documents', 'Lab reports', FileCheck2], ['/search', 'Find exhibits', Search]] : role === 'COURT' ? [['/evidence', 'Review exhibits', Gavel], ['/timeline', 'Case timeline', History], ['/documents', 'Verified records', FileCheck2]] : role === 'PROSECUTOR' ? [['/cases', 'Review case files', FolderKanban], ['/documents', 'Charge sheet drafts', ClipboardCheck], ['/search', 'Find authorities', Search]] : [['/cases/new', 'Register case', FolderKanban], ['/documents/upload', 'Upload record', ClipboardCheck], ['/evidence', 'Register evidence', ShieldCheck]]; return <div className="card p-5"><h2 className="font-semibold text-gray-900">Your tools</h2><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">{links.map(([href, label, Icon]) => <Link key={String(label)} to={String(href)} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50/40"><span className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center"><Icon className="w-4 h-4 text-gray-700" /></span><span className="text-sm font-medium text-gray-800">{label}</span></Link>)}</div></div>; }
 
-function getStatusBadgeColor(status: string): string {
-  const colors: Record<string, string> = {
-    OPEN: 'badge-blue',
-    UNDER_INVESTIGATION: 'badge-yellow',
-    CHARGE_SHEET_FILED: 'badge-purple',
-    TRIAL_IN_PROGRESS: 'badge-indigo',
-    JUDGMENT_RESERVED: 'badge-pink',
-    DISPOSED: 'badge-green',
-    APPEALED: 'badge-orange',
-    CLOSED: 'badge-gray',
-  };
-  return colors[status] || 'badge-gray';
-}
+function buildMetrics(role: UserRole, caseCount: number, counts: { documents: number; evidence: number; search: number }): Metric[] { const common = { cases: { label: 'Active cases', value: caseCount, detail: 'Assigned workspace', icon: FolderKanban, tone: 'bg-blue-100 text-blue-700', href: '/cases' }, evidence: { label: 'Evidence items', value: counts.evidence, detail: 'Across active files', icon: ShieldCheck, tone: 'bg-emerald-100 text-emerald-700', href: '/evidence' } }; if (role === 'CENTRAL_ADMIN') return [common.cases, { label: 'Pending signatures', value: 1, detail: 'Needs administrator action', icon: FileSignature, tone: 'bg-amber-100 text-amber-700', href: '/bsa' }, { label: 'Integrity alerts', value: 1, detail: 'Review before close of day', icon: ShieldAlert, tone: 'bg-red-100 text-red-700', href: '/audit' }, { label: 'System users', value: 8, detail: 'All services operational', icon: Users, tone: 'bg-emerald-100 text-emerald-700', href: '/admin/users' }]; if (role === 'FORENSIC_LAB') return [{ ...common.cases, label: 'Cases in lab' }, common.evidence, { label: 'Reports filed', value: counts.documents, detail: 'Recent case documents', icon: FileCheck2, tone: 'bg-violet-100 text-violet-700', href: '/documents' }, { label: 'Integrity score', value: '100%', detail: 'Chain checks passed', icon: CheckCircle2, tone: 'bg-emerald-100 text-emerald-700', href: '/admin/blockchain' }]; if (role === 'PROSECUTOR') return [{ ...common.cases, label: 'Active matters' }, { label: 'Drafts to sign', value: 1, detail: 'Charge sheet review', icon: FileSignature, tone: 'bg-rose-100 text-rose-700', href: '/documents' }, { label: 'Certificates pending', value: 2, detail: 'Awaiting authority', icon: FileCheck2, tone: 'bg-violet-100 text-violet-700', href: '/documents' }, { label: 'Search records', value: counts.search, detail: 'Indexed records', icon: Search, tone: 'bg-sky-100 text-sky-700', href: '/search' }]; if (role === 'COURT') return [{ ...common.cases, label: 'Docket matters', icon: Gavel }, { label: 'Exhibits to review', value: counts.evidence + 4, detail: 'Digital and physical', icon: ClipboardCheck, tone: 'bg-amber-100 text-amber-700', href: '/evidence' }, { label: 'Hearings this week', value: 3, detail: 'Next hearing Thursday', icon: Clock3, tone: 'bg-rose-100 text-rose-700', href: '/timeline' }, { label: 'Verified records', value: counts.documents, detail: 'Admissibility ready', icon: CheckCircle2, tone: 'bg-emerald-100 text-emerald-700', href: '/documents' }]; if (role === 'AUDITOR') return [{ ...common.cases, label: 'Cases in scope' }, { label: 'Open alerts', value: 1, detail: 'Integrity mismatch', icon: AlertTriangle, tone: 'bg-red-100 text-red-700', href: '/audit' }, { label: 'Events reviewed', value: 42, detail: 'This reporting period', icon: History, tone: 'bg-blue-100 text-blue-700', href: '/audit' }, { label: 'Compliance', value: '98%', detail: 'Controls in good standing', icon: CheckCircle2, tone: 'bg-emerald-100 text-emerald-700', href: '/audit' }]; return [common.cases, { label: 'Pending signatures', value: 1, detail: 'Needs your attention', icon: FileSignature, tone: 'bg-amber-100 text-amber-700', href: '/documents' }, { label: 'Integrity alerts', value: 1, detail: 'Review custody events', icon: ShieldAlert, tone: 'bg-red-100 text-red-700', href: '/evidence' }, common.evidence]; }
+
+function primaryPath(role: UserRole) { return role === 'CENTRAL_ADMIN' ? '/bsa' : role === 'FORENSIC_LAB' ? '/evidence' : role === 'PROSECUTOR' ? '/cases' : role === 'COURT' ? '/timeline' : role === 'AUDITOR' ? '/audit' : role === 'INVESTIGATING_OFFICER' ? '/cases/new' : '/cases'; }
+function primaryLabel(role: UserRole) { return role === 'CENTRAL_ADMIN' ? 'Issue certificate' : role === 'FORENSIC_LAB' ? 'Open lab queue' : role === 'PROSECUTOR' ? 'Review approvals' : role === 'COURT' ? 'Open docket' : role === 'AUDITOR' ? 'Open audit trail' : role === 'INVESTIGATING_OFFICER' ? 'Register case' : 'Open cases'; }
+function mainTitle(role: UserRole) { return role === 'FORENSIC_LAB' ? 'Lab case intake' : role === 'PROSECUTOR' ? 'Prosecution case list' : role === 'COURT' ? 'Court docket' : role === 'CENTRAL_ADMIN' ? 'Platform overview' : role === 'AUDITOR' ? 'Audit scope' : 'Assigned case list'; }
+function formatLabel(value: string) { return value.split('_').map(word => word.charAt(0) + word.slice(1).toLowerCase()).join(' '); }
+function statusColor(status: string) { const colors: Record<string, string> = { OPEN: 'badge-blue', UNDER_INVESTIGATION: 'badge-yellow', CHARGE_SHEET_FILED: 'badge-purple', TRIAL_IN_PROGRESS: 'badge-indigo', JUDGMENT_RESERVED: 'badge-pink', DISPOSED: 'badge-green', APPEALED: 'badge-orange', CLOSED: 'badge-gray' }; return colors[status] || 'badge-gray'; }
+function priorityColor(priority: string) { const colors: Record<string, string> = { LOW: 'badge-green', MEDIUM: 'badge-yellow', HIGH: 'badge-orange', CRITICAL: 'badge-red' }; return colors[priority] || 'badge-gray'; }
+

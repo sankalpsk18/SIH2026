@@ -1,6 +1,6 @@
 // ============================================================================
-// ADALAT360 - Evidence Page
-// Evidence listing and management
+// ADALAT360 - Evidence Page (Exhibit Register)
+// Redesigned to match Exhibit Register layout with card grid + registration form
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
@@ -16,340 +16,393 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  MoreVertical,
-  Eye,
-  Download,
-  Edit,
-  Trash2,
-  Clock,
-  AlertTriangle,
   QrCode,
-  ArrowRightLeft,
-  FlaskConical,
-  Gavel,
-  Truck,
-  Archive,
-  CheckCircle2,
+  Package,
 } from 'lucide-react';
-import { evidenceApi } from '../services/api';
+import { casesApi, evidenceApi } from '../services/api';
 import { Evidence, EvidenceType, EvidenceStatus } from '../types';
 import { toast } from 'react-hot-toast';
 
-const evidenceTypes: EvidenceType[] = ['DIGITAL', 'PHYSICAL', 'DOCUMENTARY', 'BIOLOGICAL', 'CHEMICAL', 'FIREARM', 'VEHICLE', 'ELECTRONIC_DEVICE', 'FINANCIAL_RECORD', 'OTHER'];
-const evidenceStatuses: EvidenceStatus[] = ['SEIZED', 'IN_CUSTODY', 'SENT_FOR_ANALYSIS', 'UNDER_ANALYSIS', 'ANALYSIS_COMPLETE', 'PRESENTED_IN_COURT', 'RETURNED', 'DISPOSED', 'DESTROYED'];
-
-const filterSchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-  caseId: z.string().optional(),
-  evidenceType: z.enum(evidenceTypes as [EvidenceType, ...EvidenceType[]]).optional(),
-  status: z.enum(evidenceStatuses as [EvidenceStatus, ...EvidenceStatus[]]).optional(),
-  current_custodian_id: z.string().uuid().optional(),
-  forensic_lab_id: z.string().uuid().optional(),
-  search: z.string().optional(),
+// ---------- Registration form schema ----------
+const registerSchema = z.object({
+  exhibitName: z.string().min(1, 'Exhibit name is required'),
+  caseId: z.string().min(1, 'Please select a case'),
+  currentLocation: z.string().optional(),
 });
+type RegisterFormData = z.infer<typeof registerSchema>;
 
-type FilterFormData = z.infer<typeof filterSchema>;
-
+// ---------- Main component ----------
 export function EvidencePage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+
+  // Data
   const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [cases, setCases] = useState<{ id: string; case_number: string; title: string }[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
 
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>(searchParams.get('caseId') || '');
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
+
+  // Registration form
   const {
     register,
     handleSubmit,
-    watch,
-    setValue,
+    reset,
     formState: { errors },
-  } = useForm<FilterFormData>({
-    resolver: zodResolver(filterSchema),
-    defaultValues: {
-      page: 1,
-      limit: 20,
-    },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
   });
 
-  const caseId = watch('caseId');
+  // ---------- Load cases ----------
+  useEffect(() => {
+    casesApi
+      .list({ limit: 100, sort_by: 'created_at', sort_order: 'desc' })
+      .then((r) => setCases(r.data.cases || []))
+      .catch(() => toast.error('Could not load cases'));
+  }, []);
 
+  // ---------- Load evidence when filters change ----------
   useEffect(() => {
     loadEvidence();
-  }, [page, limit, caseId]);
+  }, [page, selectedCaseId, filterType, filterStatus]);
 
   const loadEvidence = async () => {
     if (!selectedCaseId) {
-      // No case selected - show empty state
       setEvidence([]);
       setTotal(0);
       setTotalPages(1);
-      setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      const params = {
-        page,
-        limit,
-      };
+      const params: Record<string, any> = { page, limit };
+      if (filterType) params.evidenceType = filterType;
+      if (filterStatus) params.status = filterStatus;
       const response = await evidenceApi.listByCase(selectedCaseId, params);
       setEvidence(response.data.evidence);
       setTotal(response.data.total);
       setTotalPages(response.data.totalPages);
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to load evidence');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const onSubmit = (data: FilterFormData) => {
-    setPage(1);
-    setSelectedCaseId(data.caseId || '');
-  };
-
-  const handleDelete = async (evidenceId: string) => {
-    if (!confirm('Are you sure you want to delete this evidence? This action cannot be undone.')) {
-      return;
+  // ---------- Register new exhibit ----------
+  const onRegister = async (data: RegisterFormData) => {
+    setIsRegistering(true);
+    try {
+      await evidenceApi.create({
+        caseId: data.caseId,
+        name: data.exhibitName,
+        evidenceType: 'PHYSICAL',
+        seized_at: new Date().toISOString(),
+        seized_by: 'current-user',
+        current_location: data.currentLocation || undefined,
+      });
+      toast.success('Exhibit registered & QR tag generated');
+      reset();
+      if (data.caseId === selectedCaseId) loadEvidence();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setIsRegistering(false);
     }
-    // Note: Delete endpoint not implemented in API yet
-    toast.error('Delete not implemented');
   };
 
-  const getStatusIcon = (status: EvidenceStatus) => {
-    const icons: Record<EvidenceStatus, React.ReactNode> = {
-      SEIZED: <ShieldCheck className="w-4 h-4" />,
-      IN_CUSTODY: <ShieldCheck className="w-4 h-4" />,
-      SENT_FOR_ANALYSIS: <FlaskConical className="w-4 h-4" />,
-      UNDER_ANALYSIS: <FlaskConical className="w-4 h-4" />,
-      ANALYSIS_COMPLETE: <CheckCircle2 className="w-4 h-4" />,
-      PRESENTED_IN_COURT: <Gavel className="w-4 h-4" />,
-      RETURNED: <ArrowRightLeft className="w-4 h-4" />,
-      DISPOSED: <Archive className="w-4 h-4" />,
-      DESTROYED: <Trash2 className="w-4 h-4" />,
-    };
-    return icons[status] || <ShieldCheck className="w-4 h-4" />;
+  // ---------- Delete ----------
+  const handleDelete = async (evidenceId: string) => {
+    if (!confirm('Delete this exhibit? This cannot be undone.')) return;
+    try {
+      await evidenceApi.delete(evidenceId);
+      toast.success('Exhibit removed');
+      loadEvidence();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete');
+    }
   };
 
-  if (isLoading && evidence.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
-      </div>
-    );
-  }
-
+  // ---------- Render ----------
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Evidence</h1>
-          <p className="text-gray-600 mt-1">Manage physical and digital evidence</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowFilters(!showFilters)} className="btn-secondary">
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
-          </button>
-          <Link to="/evidence/new" className="btn-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Evidence
-          </Link>
-        </div>
+    <div className="space-y-8">
+      {/* ---- Header ---- */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Exhibit Register</h1>
+        <p className="text-gray-500 mt-1 text-sm">
+          Register, track and manage physical & digital exhibits across cases
+        </p>
       </div>
 
-      {/* Case Selector & Filters */}
-      <div className="card p-4">
-        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ---- Case selector + filters strip ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="label">Case</label>
-            <select {...register('caseId')} className="input">
-              <option value="">All Cases</option>
+            <select
+              value={selectedCaseId}
+              onChange={(e) => { setSelectedCaseId(e.target.value); setPage(1); }}
+              className="input"
+            >
+              <option value="">Select case…</option>
+              {cases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.case_number} · {c.title}
+                </option>
+              ))}
             </select>
           </div>
           <div>
             <label className="label">Evidence Type</label>
-            <select {...register('evidenceType')} className="input">
+            <select
+              value={filterType}
+              onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
+              className="input"
+            >
               <option value="">All Types</option>
-              {evidenceTypes.map(t => (
+              {EVIDENCE_TYPES.map((t) => (
                 <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>
               ))}
             </select>
           </div>
           <div>
             <label className="label">Status</label>
-            <select {...register('status')} className="input">
+            <select
+              value={filterStatus}
+              onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+              className="input"
+            >
               <option value="">All Statuses</option>
-              {evidenceStatuses.map(s => (
-                <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+              {EVIDENCE_STATUSES.map((s) => (
+                <option key={s} value={s}>{formatStatus(s)}</option>
               ))}
             </select>
           </div>
           <div className="flex items-end">
-            <button type="submit" className="btn-primary w-full">
-              <Search className="w-4 h-4 mr-2" />
-              Apply
+            <button
+              onClick={() => { setSelectedCaseId(''); setFilterType(''); setFilterStatus(''); setPage(1); }}
+              className="btn-secondary w-full"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ---- Exhibit Cards Grid ---- */}
+      <div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : evidence.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {evidence.map((item) => (
+              <ExhibitCard key={item.id} item={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-16 text-center">
+            <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No exhibits found</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {selectedCaseId
+                ? 'No evidence items match your filters'
+                : 'Select a case above to view its exhibits'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ---- Pagination ---- */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3 flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(page - 1)}
+              disabled={page === 1}
+              className="btn-secondary btn-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm text-gray-600 px-2">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={page === totalPages}
+              className="btn-secondary btn-sm"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Register New Exhibit Form ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">Register New Exhibit</h2>
+
+        <form onSubmit={handleSubmit(onRegister)} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Exhibit Name */}
+          <div>
+            <label className="label">Exhibit Name</label>
+            <input
+              {...register('exhibitName')}
+              type="text"
+              placeholder="e.g., Seized weapon"
+              className={`input ${errors.exhibitName ? 'input-error' : ''}`}
+            />
+            {errors.exhibitName && (
+              <p className="text-xs text-red-500 mt-1">{errors.exhibitName.message}</p>
+            )}
+          </div>
+
+          {/* Case ID */}
+          <div>
+            <label className="label">Case ID</label>
+            <select
+              {...register('caseId')}
+              className={`input ${errors.caseId ? 'input-error' : ''}`}
+            >
+              <option value="">Select case…</option>
+              {cases.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.case_number} · {c.title}
+                </option>
+              ))}
+            </select>
+            {errors.caseId && (
+              <p className="text-xs text-red-500 mt-1">{errors.caseId.message}</p>
+            )}
+          </div>
+
+          {/* Current Location */}
+          <div>
+            <label className="label">Current Location</label>
+            <input
+              {...register('currentLocation')}
+              type="text"
+              placeholder="e.g., Evidence Locker A"
+              className="input"
+            />
+          </div>
+
+          {/* Submit button — full width on mobile, auto on md+ */}
+          <div className="md:col-span-3">
+            <button
+              type="submit"
+              disabled={isRegistering}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold text-white
+                         bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700
+                         shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+            >
+              {isRegistering ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <QrCode className="w-4 h-4" />
+              )}
+              Generate QR Tag & Register
             </button>
           </div>
         </form>
-      </div>
-
-      {/* Evidence Table */}
-      <div className="card overflow-hidden">
-        {isLoading && evidence.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Evidence Number</th>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Seized</th>
-                    <th>Current Custodian</th>
-                    <th>Location</th>
-                    <th className="w-48">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {evidence.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                        <ShieldCheck className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">No evidence found</p>
-                        <p className="text-sm text-gray-400 mt-1">Add your first evidence item or adjust filters</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    evidence.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="font-mono font-medium text-gray-900">
-                          <Link to={`/evidence/${item.id}`} className="hover:text-primary-600">
-                            {item.evidence_number}
-                          </Link>
-                        </td>
-                        <td>
-                          <Link to={`/evidence/${item.id}`} className="font-medium text-gray-900 hover:text-primary-600 truncate block max-w-xs">
-                            {item.name}
-                          </Link>
-                          {item.description && (
-                            <p className="text-xs text-gray-500 line-clamp-1">{item.description}</p>
-                          )}
-                        </td>
-                        <td>
-                          <span className="badge badge-blue">{item.evidence_type.replace(/_/g, ' ')}</span>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(item.status)}
-                            <span className={`badge ${getStatusBadgeColor(item.status)}`}>
-                              {formatStatus(item.status)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="text-gray-500 whitespace-nowrap">
-                          {new Date(item.seized_at).toLocaleDateString()}
-                        </td>
-                        <td className="text-gray-600">
-                          {item.current_custodian_name || item.current_custodian_id?.slice(0, 8) + '...' || '—'}
-                        </td>
-                        <td className="text-gray-500 truncate max-w-xs">
-                          {item.current_location || '—'}
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <Link to={`/evidence/${item.id}`} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" title="View">
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                            <Link to={`/evidence/${item.id}/custody-chain`} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" title="Custody Chain">
-                              <Clock className="w-4 h-4" />
-                            </Link>
-                            <Link to={`/evidence/${item.id}/qr-code`} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" title="QR Code">
-                              <QrCode className="w-4 h-4" />
-                            </Link>
-                            <div className="relative">
-                              <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                              <div className="dropdown-menu">
-                                <Link to={`/evidence/${item.id}/transfer`} className="dropdown-item">
-                                  <ArrowRightLeft className="w-4 h-4" />
-                                  Transfer Custody
-                                </Link>
-                                <Link to={`/evidence/${item.id}/send-to-lab`} className="dropdown-item">
-                                  <FlaskConical className="w-4 h-4" />
-                                  Send to Lab
-                                </Link>
-                                <Link to={`/evidence/${item.id}/court-submission`} className="dropdown-item">
-                                  <Gavel className="w-4 h-4" />
-                                  Submit to Court
-                                </Link>
-                                <hr className="my-1 border-gray-100" />
-                                <button onClick={() => handleDelete(item.id)} className="dropdown-item text-danger-600">
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-gray-200 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total} evidence items
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setPage(page - 1)} disabled={page === 1} className="btn-secondary btn-sm">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="px-3 text-sm text-gray-600">Page {page} of {totalPages}</span>
-                  <button onClick={() => setPage(page + 1)} disabled={page === totalPages} className="btn-secondary btn-sm">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
     </div>
   );
 }
 
-function formatStatus(status: string): string {
-  return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+// ============================================================================
+// Exhibit Card Component
+// ============================================================================
+
+function ExhibitCard({ item }: { item: Evidence }) {
+  return (
+    <Link
+      to={`/evidence/${item.id}`}
+      className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
+    >
+      {/* QR code area */}
+      <div className="bg-slate-50 flex items-center justify-center py-6 px-4">
+        <div className="w-20 h-20 bg-white border border-gray-200 rounded-lg flex items-center justify-center shadow-inner relative">
+          <QrCode className="w-9 h-9 text-gray-300 group-hover:text-gray-400 transition-colors" />
+          {/* tiny hash overlay */}
+          <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-mono text-gray-400 leading-none select-none truncate max-w-[70px]">
+            {item.qr_code_hash?.slice(0, 10) || '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Info area */}
+      <div className="p-4 text-center flex-1 flex flex-col items-center">
+        {/* Evidence number */}
+        <p className="font-bold text-gray-900 text-sm">{item.evidence_number}</p>
+
+        {/* Name / description */}
+        <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+          {item.name}
+        </p>
+
+        {/* Status badge */}
+        <span className={`mt-3 inline-block ${getStatusStyle(item.status)}`}>
+          {formatStatus(item.status)}
+        </span>
+
+        {/* Location + case ref */}
+        <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+          {item.current_location || item.current_custodian_name || 'Location pending'}
+        </p>
+        <p className="text-[11px] font-mono text-gray-400 mt-0.5">
+          {item.evidence_number}
+        </p>
+      </div>
+    </Link>
+  );
 }
 
-function getStatusBadgeColor(status: string): string {
-  const colors: Record<string, string> = {
-    SEIZED: 'badge-blue',
-    IN_CUSTODY: 'badge-green',
-    SENT_FOR_ANALYSIS: 'badge-yellow',
-    UNDER_ANALYSIS: 'badge-orange',
-    ANALYSIS_COMPLETE: 'badge-green',
-    PRESENTED_IN_COURT: 'badge-purple',
-    RETURNED: 'badge-blue',
-    DISPOSED: 'badge-gray',
-    DESTROYED: 'badge-red',
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const EVIDENCE_TYPES: EvidenceType[] = [
+  'DIGITAL', 'PHYSICAL', 'DOCUMENTARY', 'BIOLOGICAL', 'CHEMICAL',
+  'FIREARM', 'VEHICLE', 'ELECTRONIC_DEVICE', 'FINANCIAL_RECORD', 'OTHER',
+];
+
+const EVIDENCE_STATUSES: EvidenceStatus[] = [
+  'SEIZED', 'IN_CUSTODY', 'SENT_FOR_ANALYSIS', 'UNDER_ANALYSIS',
+  'ANALYSIS_COMPLETE', 'PRESENTED_IN_COURT', 'RETURNED', 'DISPOSED', 'DESTROYED',
+];
+
+function formatStatus(status: string): string {
+  return status
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/** Returns Tailwind classes for the status badge */
+function getStatusStyle(status: EvidenceStatus): string {
+  const base = 'px-2.5 py-0.5 rounded-full text-xs font-semibold';
+  const map: Record<string, string> = {
+    SEIZED:              `${base} bg-blue-50 text-blue-700`,
+    IN_CUSTODY:          `${base} bg-emerald-50 text-emerald-700`,
+    SENT_FOR_ANALYSIS:   `${base} bg-amber-50 text-amber-700`,
+    UNDER_ANALYSIS:      `${base} bg-amber-50 text-amber-700 font-bold`,
+    ANALYSIS_COMPLETE:   `${base} bg-emerald-50 text-emerald-700`,
+    PRESENTED_IN_COURT:  `${base} bg-purple-50 text-purple-700`,
+    RETURNED:            `${base} bg-sky-50 text-sky-700`,
+    DISPOSED:            `${base} bg-gray-100 text-gray-600`,
+    DESTROYED:           `${base} bg-red-50 text-red-700`,
   };
-  return colors[status] || 'badge-gray';
+  return map[status] || `${base} bg-gray-100 text-gray-600`;
 }
