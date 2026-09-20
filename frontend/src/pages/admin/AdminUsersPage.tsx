@@ -91,6 +91,7 @@ export function AdminUsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [viewingUser, setViewingUser] = useState<UserRecord | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const {
     register,
@@ -325,10 +326,10 @@ export function AdminUsersPage() {
                               <Edit className="w-4 h-4" />
                             </button>
                             <div className="relative">
-                              <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
+                              <button onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)} className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg" aria-expanded={openMenuId === user.id}>
                                 <MoreVertical className="w-4 h-4" />
                               </button>
-                              <div className="dropdown-menu">
+                              {openMenuId === user.id && <div className="dropdown-menu">
                                 <button onClick={() => onRoleChange(user.id, user.role === 'CENTRAL_ADMIN' ? 'INVESTIGATING_OFFICER' : 'CENTRAL_ADMIN')} className="dropdown-item">
                                   <Shield className="w-4 h-4" />
                                   Change Role
@@ -346,7 +347,7 @@ export function AdminUsersPage() {
                                   <Trash2 className="w-4 h-4" />
                                   Delete User
                                 </button>
-                              </div>
+                              </div>}
                             </div>
                           </div>
                         </td>

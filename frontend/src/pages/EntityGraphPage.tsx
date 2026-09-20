@@ -1,72 +1,186 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Link, Search, Target, Users, Globe, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Filter, Settings } from 'lucide-react';
+import {
+  Download, Search, Target, ZoomIn, ZoomOut, RotateCcw, X,
+  User, Building2, MapPin, FileText, ShieldCheck, Briefcase,
+} from 'lucide-react';
 import { casesApi, entityGraphApi } from '../services/api';
 import { Case } from '../types';
 
-interface EntityNode {
+// ============================================================================
+// Types
+// ============================================================================
+
+interface GNode {
   id: string;
   label: string;
   type: 'person' | 'organization' | 'location' | 'evidence' | 'document' | 'case';
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   color: string;
+  radius: number;
 }
 
-interface EntityEdge {
+interface GEdge {
   source: string;
   target: string;
   label: string;
 }
 
+// ============================================================================
+// Constants
+// ============================================================================
+
+const NODE_COLORS: Record<string, string> = {
+  person: '#3B82F6',
+  organization: '#8B5CF6',
+  location: '#10B981',
+  evidence: '#F59E0B',
+  document: '#EC4899',
+  case: '#6366F1',
+};
+
+const NODE_ICONS: Record<string, React.FC<{ className?: string }>> = {
+  person: User,
+  organization: Building2,
+  location: MapPin,
+  evidence: ShieldCheck,
+  document: FileText,
+  case: Briefcase,
+};
+
+// ============================================================================
+// Force simulation helpers
+// ============================================================================
+
+function runForceSimulation(nodes: GNode[], edges: GEdge[], width: number, height: number, iterations = 120) {
+  // Center
+  const cx = width / 2;
+  const cy = height / 2;
+
+  // Place nodes in a circle initially
+  nodes.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / nodes.length;
+    const r = Math.min(width, height) * 0.3;
+    n.x = cx + r * Math.cos(angle);
+    n.y = cy + r * Math.sin(angle);
+    n.vx = 0;
+    n.vy = 0;
+  });
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const alpha = 1 - iter / iterations; // cooling
+    const repulsion = 8000 * alpha;
+    const attraction = 0.005;
+    const centerPull = 0.01 * alpha;
+
+    // Repulsion between every pair
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        const dist = Math.max(Math.hypot(dx, dy), 1);
+        const force = repulsion / (dist * dist);
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vx -= fx;
+        a.vy -= fy;
+        b.vx += fx;
+        b.vy += fy;
+      }
+    }
+
+    // Attraction along edges
+    edges.forEach((e) => {
+      const s = nodeMap.get(e.source);
+      const t = nodeMap.get(e.target);
+      if (!s || !t) return;
+      const dx = t.x - s.x;
+      const dy = t.y - s.y;
+      const dist = Math.max(Math.hypot(dx, dy), 1);
+      const force = dist * attraction;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+      s.vx += fx;
+      s.vy += fy;
+      t.vx -= fx;
+      t.vy -= fy;
+    });
+
+    // Center gravity
+    nodes.forEach((n) => {
+      n.vx += (cx - n.x) * centerPull;
+      n.vy += (cy - n.y) * centerPull;
+    });
+
+    // Apply velocity with damping
+    const damping = 0.85;
+    nodes.forEach((n) => {
+      n.vx *= damping;
+      n.vy *= damping;
+      n.x += n.vx;
+      n.y += n.vy;
+      // Keep within bounds (with padding)
+      n.x = Math.max(60, Math.min(width - 60, n.x));
+      n.y = Math.max(60, Math.min(height - 60, n.y));
+    });
+  }
+}
+
+// ============================================================================
+// Main component
+// ============================================================================
+
 export function EntityGraphPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
+
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>(caseId || '');
   const [isLoadingCases, setIsLoadingCases] = useState(!caseId);
-  const [nodes, setNodes] = useState<EntityNode[]>([]);
-  const [edges, setEdges] = useState<EntityEdge[]>([]);
+
+  const [nodes, setNodes] = useState<GNode[]>([]);
+  const [edges, setEdges] = useState<GEdge[]>([]);
   const [isLoadingGraph, setIsLoadingGraph] = useState(false);
-  const [graphData, setGraphData] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'network' | 'table'>('network');
-  const [selectedNode, setSelectedNode] = useState<EntityNode | null>(null);
+
+  const [selectedNode, setSelectedNode] = useState<GNode | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<GNode | null>(null);
+
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Color scheme for node types
-  const nodeColors = {
-    person: '#3B82F6',
-    organization: '#8B5CF6',
-    location: '#10B981',
-    evidence: '#F59E0B',
-    document: '#EC4899',
-    case: '#6366F1',
-  };
-
-  // Load user's accessible cases
+  // ---- Load cases ----
   useEffect(() => {
-    const loadCases = async () => {
-      if (isLoadingCases) {
-        try {
-          const res = await casesApi.list({ limit: 100, sort_by: 'created_at', sort_order: 'desc' });
-          setCases(res.data.cases || []);
-          if (!selectedCaseId && res.data.cases?.length > 0) {
-            setSelectedCaseId(res.data.cases[0].id);
-            navigate(`/entity-graph/${res.data.cases[0].id}`);
-          }
-        } catch (error) {
-          console.error('Failed to load cases:', error);
-        } finally {
-          setIsLoadingCases(false);
+    if (!isLoadingCases) return;
+    (async () => {
+      try {
+        const res = await casesApi.list({ limit: 100, sort_by: 'created_at', sort_order: 'desc' });
+        setCases(res.data.cases || []);
+        if (!selectedCaseId && res.data.cases?.length > 0) {
+          setSelectedCaseId(res.data.cases[0].id);
+          navigate(`/cases/${res.data.cases[0].id}/entity-graph`);
         }
+      } catch {
+        console.error('Failed to load cases');
+      } finally {
+        setIsLoadingCases(false);
       }
-    };
-    loadCases();
+    })();
   }, [isLoadingCases]);
 
-  // Load entity graph when caseId changes
+  // ---- Load graph when caseId changes ----
   useEffect(() => {
     if (!selectedCaseId) return;
     loadGraph();
@@ -76,47 +190,55 @@ export function EntityGraphPage() {
     if (!selectedCaseId) return;
     setIsLoadingGraph(true);
     try {
-      // Try to fetch from API, fallback to mock data
-      let data;
+      let data: any;
       try {
         const res = await entityGraphApi.getGraph(selectedCaseId, { includeDocuments: true, includeEvidence: true });
         data = res.data;
-      } catch (e) {
-        // Generate mock graph data for demo
-        data = generateMockGraphData(selectedCaseId);
+      } catch {
+        data = generateMockGraphData();
       }
 
-      if (data?.nodes && data?.edges) {
-        setNodes(data.nodes.map((n: any) => ({
-          ...n,
-          color: n.color || nodeColors[n.type as keyof typeof nodeColors] || '#6B7280',
-          x: n.x || Math.random() * 800,
-          y: n.y || Math.random() * 500,
-        })));
-        setEdges(data.edges);
-      }
-      setGraphData(data);
-    } catch (error) {
-      console.error('Failed to load entity graph:', error);
+      if (!data?.nodes?.length) data = generateMockGraphData();
+
+      const canvas = canvasRef.current;
+      const w = canvas?.getBoundingClientRect().width || 900;
+      const h = 600;
+
+      const gNodes: GNode[] = data.nodes.map((n: any) => ({
+        ...n,
+        color: n.color || NODE_COLORS[n.type] || '#6B7280',
+        radius: n.type === 'case' ? 34 : 26,
+        vx: 0,
+        vy: 0,
+        x: 0,
+        y: 0,
+      }));
+
+      runForceSimulation(gNodes, data.edges, w, h);
+      setNodes(gNodes);
+      setEdges(data.edges);
+    } catch {
+      console.error('Failed to load entity graph');
     } finally {
       setIsLoadingGraph(false);
     }
   };
 
-  const generateMockGraphData = (caseId: string) => {
-    const mockNodes: EntityNode[] = [
-      { id: 'case-1', label: 'Case FIR/2024/DEL/001234', type: 'case', x: 400, y: 100, color: nodeColors.case },
-      { id: 'person-1', label: 'Amit Verma', type: 'person', x: 200, y: 250, color: nodeColors.person },
-      { id: 'person-2', label: 'Priya Sharma', type: 'person', x: 600, y: 250, color: nodeColors.person },
-      { id: 'person-3', label: 'Rajesh Kumar', type: 'person', x: 400, y: 400, color: nodeColors.person },
-      { id: 'org-1', label: 'MediCore Labs', type: 'organization', x: 100, y: 350, color: nodeColors.organization },
-      { id: 'org-2', label: 'Delhi Police', type: 'organization', x: 700, y: 350, color: nodeColors.organization },
-      { id: 'loc-1', label: 'Saket, Delhi', type: 'location', x: 300, y: 500, color: nodeColors.location },
-      { id: 'evi-1', label: 'EVD-104 (Mobile Phone)', type: 'evidence', x: 500, y: 500, color: nodeColors.evidence },
-      { id: 'doc-1', label: 'FIR Document', type: 'document', x: 400, y: 50, color: nodeColors.document },
+  // ---- Generate mock data ----
+  const generateMockGraphData = () => {
+    const mockNodes = [
+      { id: 'case-1', label: 'Case FIR/2024/DEL/001234', type: 'case' },
+      { id: 'person-1', label: 'Amit Verma', type: 'person' },
+      { id: 'person-2', label: 'Priya Sharma', type: 'person' },
+      { id: 'person-3', label: 'Rajesh Kumar', type: 'person' },
+      { id: 'org-1', label: 'MediCore Labs', type: 'organization' },
+      { id: 'org-2', label: 'Delhi Police', type: 'organization' },
+      { id: 'loc-1', label: 'Saket, Delhi', type: 'location' },
+      { id: 'evi-1', label: 'EVD-104 (Phone)', type: 'evidence' },
+      { id: 'doc-1', label: 'FIR Document', type: 'document' },
     ];
 
-    const mockEdges: EntityEdge[] = [
+    const mockEdges: GEdge[] = [
       { source: 'case-1', target: 'person-1', label: 'Investigator' },
       { source: 'case-1', target: 'person-2', label: 'Prosecutor' },
       { source: 'case-1', target: 'person-3', label: 'Witness' },
@@ -132,135 +254,205 @@ export function EntityGraphPage() {
     return { nodes: mockNodes, edges: mockEdges };
   };
 
-  // Canvas drawing for network view
+  // ---- Canvas drawing ----
   useEffect(() => {
-    if (!canvasRef.current) return;
     const canvas = canvasRef.current;
+    if (!canvas || nodes.length === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const draw = () => {
-      const { width, height } = canvas.getBoundingClientRect();
-      canvas.width = width * window.devicePixelRatio;
-      canvas.height = height * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
 
-      // Clear
-      ctx.clearRect(0, 0, width, height);
+    const W = rect.width;
+    const H = rect.height;
 
-      // Draw edges
-      edges.forEach(edge => {
-        const source = nodes.find(n => n.id === edge.source);
-        const target = nodes.find(n => n.id === edge.target);
-        if (!source || !target) return;
+    ctx.clearRect(0, 0, W, H);
 
-        const sx = source.x * zoom + pan.x;
-        const sy = source.y * zoom + pan.y;
-        const tx = target.x * zoom + pan.x;
-        const ty = target.y * zoom + pan.y;
-
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(tx, ty);
-        ctx.strokeStyle = '#9CA3AF';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Draw edge label
-        const mx = (sx + tx) / 2;
-        const my = (sy + ty) / 2;
-        ctx.fillStyle = '#6B7280';
-        ctx.font = '11px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText(edge.label, mx, my - 5);
+    // Build a set of connected node IDs for hovered / selected highlights
+    const highlightIds = new Set<string>();
+    const focusNode = hoveredNode || selectedNode;
+    if (focusNode) {
+      highlightIds.add(focusNode.id);
+      edges.forEach((e) => {
+        if (e.source === focusNode.id) highlightIds.add(e.target);
+        if (e.target === focusNode.id) highlightIds.add(e.source);
       });
+    }
 
-      // Draw nodes
-      nodes.forEach(node => {
-        const x = node.x * zoom + pan.x;
-        const y = node.y * zoom + pan.y;
-        const radius = Math.max(20, 30 * zoom);
+    const dimmed = !!focusNode;
 
-        // Node circle
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = node.color;
-        ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    // Helper to transform coords
+    const tx = (x: number) => x * zoom + pan.x;
+    const ty = (y: number) => y * zoom + pan.y;
 
-        // Node label
+    // ---- Draw edges ----
+    edges.forEach((edge) => {
+      const src = nodes.find((n) => n.id === edge.source);
+      const tgt = nodes.find((n) => n.id === edge.target);
+      if (!src || !tgt) return;
+
+      const x1 = tx(src.x);
+      const y1 = ty(src.y);
+      const x2 = tx(tgt.x);
+      const y2 = ty(tgt.y);
+
+      const isHighlighted =
+        focusNode && (edge.source === focusNode.id || edge.target === focusNode.id);
+
+      ctx.save();
+      ctx.globalAlpha = dimmed ? (isHighlighted ? 1 : 0.1) : 0.5;
+      ctx.strokeStyle = isHighlighted ? '#3B82F6' : '#CBD5E1';
+      ctx.lineWidth = isHighlighted ? 2.5 : 1.2;
+
+      // Curved bezier line
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const dist = Math.hypot(dx, dy);
+      // offset perpendicular for curve
+      const curveOffset = Math.min(dist * 0.12, 30);
+      const cx1 = mx - (dy / dist) * curveOffset;
+      const cy1 = my + (dx / dist) * curveOffset;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(cx1, cy1, x2, y2);
+      ctx.stroke();
+
+      // Edge label on a white pill
+      if (zoom > 0.5) {
+        const lx = (x1 + 2 * cx1 + x2) / 4;
+        const ly = (y1 + 2 * cy1 + y2) / 4;
+        const text = edge.label;
+        ctx.font = `${Math.max(9, 10 * zoom)}px Inter, system-ui, sans-serif`;
+        const textW = ctx.measureText(text).width;
+
+        ctx.globalAlpha = dimmed ? (isHighlighted ? 0.95 : 0.08) : 0.85;
+        // Pill background
+        const pillH = 16;
+        const pillW = textW + 12;
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = `bold ${Math.max(10, 12 * zoom)}px Inter`;
+        ctx.beginPath();
+        const r = pillH / 2;
+        ctx.roundRect(lx - pillW / 2, ly - pillH / 2, pillW, pillH, r);
+        ctx.fill();
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        ctx.fillStyle = isHighlighted ? '#1E40AF' : '#64748B';
         ctx.textAlign = 'center';
-        const label = node.label.length > 18 ? node.label.slice(0, 16) + '…' : node.label;
-        ctx.fillText(label, x, y + 4);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, lx, ly);
+      }
 
-        // Highlight selected node
-        if (selectedNode?.id === node.id) {
-          ctx.beginPath();
-          ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
-          ctx.strokeStyle = '#F59E0B';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-      });
-    };
+      ctx.restore();
+    });
 
-    draw();
-  }, [nodes, edges, zoom, pan, selectedNode]);
+    // ---- Draw nodes ----
+    nodes.forEach((node) => {
+      const x = tx(node.x);
+      const y = ty(node.y);
+      const r = node.radius * zoom;
 
-  // Mouse handlers for pan/zoom
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(prev => Math.min(Math.max(prev * delta, 0.3), 3));
+      const isFocus = focusNode?.id === node.id;
+      const isConnected = highlightIds.has(node.id);
+
+      ctx.save();
+      ctx.globalAlpha = dimmed ? (isConnected ? 1 : 0.15) : 1;
+
+      // Outer glow for focused node
+      if (isFocus) {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+        ctx.fillStyle = node.color + '30'; // 30 hex = ~19% alpha
+        ctx.fill();
+      }
+
+      // Node circle with white border
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = node.color;
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Icon initial in white
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.max(11, 13 * zoom)}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.label.charAt(0).toUpperCase(), x, y);
+
+      ctx.restore();
+
+      // Label below node
+      ctx.save();
+      ctx.globalAlpha = dimmed ? (isConnected ? 1 : 0.12) : 0.9;
+      ctx.fillStyle = '#1E293B';
+      ctx.font = `600 ${Math.max(10, 11 * zoom)}px Inter, system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const label = node.label.length > 20 ? node.label.slice(0, 18) + '…' : node.label;
+      ctx.fillText(label, x, y + r + 5);
+
+      // Type label
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = `${Math.max(8, 9 * zoom)}px Inter, system-ui, sans-serif`;
+      ctx.fillText(node.type, x, y + r + 5 + (13 * zoom));
+      ctx.restore();
+    });
+  }, [nodes, edges, zoom, pan, selectedNode, hoveredNode]);
+
+  // ---- Mouse interactions ----
+  const getNodeAtPos = useCallback(
+    (clientX: number, clientY: number): GNode | null => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const mx = (clientX - rect.left - pan.x) / zoom;
+      const my = (clientY - rect.top - pan.y) / zoom;
+      return nodes.find((n) => Math.hypot(n.x - mx, n.y - my) < n.radius + 4) || null;
+    },
+    [nodes, zoom, pan]
+  );
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    const node = getNodeAtPos(e.clientX, e.clientY);
+    setSelectedNode(node && selectedNode?.id === node.id ? null : node);
   };
 
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPan, setLastPan] = useState({ x: 0, y: 0 });
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan((p) => ({
+        x: p.x + e.clientX - lastPan.x,
+        y: p.y + e.clientY - lastPan.y,
+      }));
+      setLastPan({ x: e.clientX, y: e.clientY });
+      return;
+    }
+    const node = getNodeAtPos(e.clientX, e.clientY);
+    setHoveredNode(node);
+    if (canvasRef.current) canvasRef.current.style.cursor = node ? 'pointer' : 'grab';
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0 && !selectedNode) {
+    if (e.button === 0) {
       setIsPanning(true);
       setLastPan({ x: e.clientX, y: e.clientY });
     }
   };
+  const handleMouseUp = () => setIsPanning(false);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      const dx = e.clientX - lastPan.x;
-      const dy = e.clientY - lastPan.y;
-      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      setLastPan({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
-
-  const handleNodeClick = (node: EntityNode) => {
-    setSelectedNode(selectedNode?.id === node.id ? null : node);
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const x = (e.clientX - rect.left - pan.x) / zoom;
-    const y = (e.clientY - rect.top - pan.y) / zoom;
-
-    const clickedNode = nodes.find(n =>
-      Math.hypot(n.x - x, n.y - y) < 30 / zoom
-    );
-
-    if (clickedNode) {
-      handleNodeClick(clickedNode);
-    } else {
-      setSelectedNode(null);
-    }
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom((z) => Math.min(Math.max(z * delta, 0.3), 3));
   };
 
   const resetView = () => {
@@ -268,10 +460,11 @@ export function EntityGraphPage() {
     setPan({ x: 0, y: 0 });
   };
 
+  // ---- Loading / empty states ----
   if (isLoadingCases) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-500 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-500 border-t-transparent" />
       </div>
     );
   }
@@ -284,19 +477,16 @@ export function EntityGraphPage() {
           <p className="text-gray-600 mt-1">Explore relationships between people, organizations, and evidence</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl">
-          {cases.map(c => (
+          {cases.map((c) => (
             <button
               key={c.id}
-              onClick={() => {
-                setSelectedCaseId(c.id);
-                navigate(`/entity-graph/${c.id}`);
-              }}
+              onClick={() => { setSelectedCaseId(c.id); navigate(`/cases/${c.id}/entity-graph`); }}
               className="card p-4 hover:bg-gray-50 transition-colors text-left"
             >
               <p className="font-medium text-gray-900">{c.title}</p>
               <p className="text-sm text-gray-500 mt-1">{c.case_number}</p>
               <span className={`badge ${getStatusBadgeColor(c.status)} mt-2 inline-block`}>
-                {formatStatus(c.status)}
+                {fmtStatus(c.status)}
               </span>
             </button>
           ))}
@@ -314,18 +504,19 @@ export function EntityGraphPage() {
     );
   }
 
+  // ---- Main view ----
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Entity Graph</h1>
-          <p className="text-gray-600 mt-1">Explore relationships between people, organizations, and evidence</p>
+          <p className="text-gray-500 mt-1 text-sm">Explore relationships between people, organizations, and evidence</p>
         </div>
         <div className="flex items-center gap-3">
           <select
             value={viewMode}
-            onChange={e => setViewMode(e.target.value as 'network' | 'table')}
+            onChange={(e) => setViewMode(e.target.value as 'network' | 'table')}
             className="input w-40"
           >
             <option value="network">Network View</option>
@@ -338,35 +529,29 @@ export function EntityGraphPage() {
         </div>
       </div>
 
-      {/* Case Selector */}
+      {/* Case selector + zoom controls */}
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-4">
-          <label className="label">Case:</label>
+          <label className="label mb-0">Case:</label>
           <select
             value={selectedCaseId}
-            onChange={e => {
-              const newCaseId = e.target.value;
-              setSelectedCaseId(newCaseId);
-              navigate(`/entity-graph/${newCaseId}`);
-            }}
+            onChange={(e) => { setSelectedCaseId(e.target.value); navigate(`/cases/${e.target.value}/entity-graph`); }}
             className="input w-full max-w-md"
           >
-            {cases.map(c => (
+            {cases.map((c) => (
               <option key={c.id} value={c.id}>{c.title} ({c.case_number})</option>
             ))}
           </select>
-
           <div className="flex items-center gap-2 ml-auto">
             <button onClick={resetView} className="btn-secondary btn-sm" title="Reset View">
-              <RotateCcw className="w-4 h-4 mr-1" />
-              Reset
+              <RotateCcw className="w-4 h-4 mr-1" /> Reset
             </button>
-            <div className="flex items-center border border-gray-300 rounded-lg px-3">
-              <button onClick={() => setZoom(z => Math.max(z * 0.8, 0.3))} className="p-1 text-gray-600 hover:text-gray-900" title="Zoom Out">
+            <div className="flex items-center border border-gray-300 rounded-lg px-3 bg-white">
+              <button onClick={() => setZoom((z) => Math.max(z * 0.8, 0.3))} className="p-1 text-gray-600 hover:text-gray-900">
                 <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="px-2 text-sm text-gray-600">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(z => Math.min(z * 1.25, 3))} className="p-1 text-gray-600 hover:text-gray-900" title="Zoom In">
+              <span className="px-2 text-sm text-gray-600 tabular-nums">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom((z) => Math.min(z * 1.25, 3))} className="p-1 text-gray-600 hover:text-gray-900">
                 <ZoomIn className="w-4 h-4" />
               </button>
             </div>
@@ -374,44 +559,128 @@ export function EntityGraphPage() {
         </div>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <GraphStat label="Entities" value={nodes.length} tone="text-primary-700 bg-primary-50" />
+        <GraphStat label="Relationships" value={edges.length} tone="text-violet-700 bg-violet-50" />
+        <GraphStat label="People / Orgs" value={nodes.filter((n) => n.type === 'person' || n.type === 'organization').length} tone="text-emerald-700 bg-emerald-50" />
+        <GraphStat label="Evidence links" value={nodes.filter((n) => n.type === 'evidence' || n.type === 'document').length} tone="text-amber-700 bg-amber-50" />
+      </div>
+
       {/* Legend */}
       <div className="card p-4">
-        <div className="flex flex-wrap items-center gap-6">
-          {Object.entries(nodeColors).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-              <span className="text-sm text-gray-600 capitalize">{type}</span>
-            </div>
-          ))}
+        <div className="flex flex-wrap items-center gap-4">
+          {Object.entries(NODE_COLORS).map(([type, color]) => {
+            const Icon = NODE_ICONS[type] || Target;
+            return (
+              <div
+                key={type}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-white"
+              >
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  <Icon className="w-3 h-3" />
+                </div>
+                <span className="text-xs font-medium text-gray-600 capitalize">{type}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Graph View */}
+      {/* Graph / Table */}
       {viewMode === 'network' ? (
-        <div className="card relative">
-          <canvas
-            ref={canvasRef}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onClick={handleCanvasClick}
-            className="w-full h-[600px] bg-gray-50 cursor-grab"
-            style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
-          />
-          {isLoadingGraph && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-              <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-500 border-t-transparent"></div>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-6">
+          {/* Canvas card */}
+          <div className="card relative overflow-hidden" ref={containerRef}>
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Relationship Network</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Click a node to inspect · Drag to pan · Scroll to zoom
+                </p>
+              </div>
+              {selectedNode && (
+                <span className="badge badge-primary flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full" style={{ background: selectedNode.color }} />
+                  {selectedNode.label}
+                </span>
+              )}
             </div>
-          )}
+
+            <canvas
+              ref={canvasRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={() => { handleMouseUp(); setHoveredNode(null); }}
+              onClick={handleCanvasClick}
+              className="w-full h-[600px] bg-gradient-to-br from-slate-50 to-slate-100"
+              style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+            />
+
+            {isLoadingGraph && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary-500 border-t-transparent" />
+              </div>
+            )}
+          </div>
+
+          {/* Key entities sidebar */}
+          <div className="card p-5 h-fit">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="font-semibold text-gray-900 text-sm">Key Entities</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Click to focus on the graph</p>
+              </div>
+              <Target className="w-5 h-5 text-primary-600" />
+            </div>
+
+            <div className="space-y-1.5">
+              {nodes.slice(0, 10).map((node) => {
+                const connCount = edges.filter(
+                  (e) => e.source === node.id || e.target === node.id
+                ).length;
+                const Icon = NODE_ICONS[node.type] || Target;
+                const isActive = selectedNode?.id === node.id;
+
+                return (
+                  <button
+                    key={node.id}
+                    onClick={() => setSelectedNode(isActive ? null : node)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                      isActive ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                      style={{ backgroundColor: node.color }}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-gray-900 truncate">
+                        {node.label}
+                      </span>
+                      <span className="block text-xs text-gray-500 capitalize">
+                        {node.type} · {connCount} link{connCount !== 1 ? 's' : ''}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
-        /* Table View */
+        /* Table view */
         <div className="card">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex items-center gap-2">
             <Search className="w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Search entities..." className="input w-full max-w-sm ml-2" />
+            <input type="text" placeholder="Search entities..." className="input w-full max-w-sm" />
           </div>
           <div className="overflow-x-auto">
             <table className="table">
@@ -424,14 +693,24 @@ export function EntityGraphPage() {
                 </tr>
               </thead>
               <tbody>
-                {nodes.map(node => {
-                  const connections = edges.filter(e => e.source === node.id || e.target === node.id).length;
+                {nodes.map((node) => {
+                  const connCount = edges.filter(
+                    (e) => e.source === node.id || e.target === node.id
+                  ).length;
+                  const Icon = NODE_ICONS[node.type] || Target;
                   return (
-                    <tr key={node.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleNodeClick(node)}>
+                    <tr
+                      key={node.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedNode(node)}
+                    >
                       <td>
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-medium" style={{ backgroundColor: node.color }}>
-                            {node.label.charAt(0)}
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white"
+                            style={{ backgroundColor: node.color }}
+                          >
+                            <Icon className="w-4 h-4" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{node.label}</p>
@@ -442,7 +721,7 @@ export function EntityGraphPage() {
                       <td>
                         <span className="badge badge-blue capitalize">{node.type}</span>
                       </td>
-                      <td className="text-gray-600">{connections} connections</td>
+                      <td className="text-gray-600">{connCount} connections</td>
                       <td>
                         <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
                           <Search className="w-4 h-4" />
@@ -457,51 +736,83 @@ export function EntityGraphPage() {
         </div>
       )}
 
-      {/* Node Detail Panel */}
+      {/* Node detail panel */}
       {selectedNode && (
-        <div className="fixed inset-0 z-50 flex items-end">
-          <div className="w-full max-w-md bg-white shadow-xl rounded-t-2xl p-6 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setSelectedNode(null)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-white shadow-xl rounded-t-2xl sm:rounded-2xl p-6 animate-slide-up z-10">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: selectedNode.color }}>
-                  {selectedNode.label.charAt(0)}
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"
+                  style={{ backgroundColor: selectedNode.color }}
+                >
+                  {(() => {
+                    const Icon = NODE_ICONS[selectedNode.type] || Target;
+                    return <Icon className="w-6 h-6" />;
+                  })()}
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{selectedNode.label}</p>
                   <p className="text-sm text-gray-500 capitalize">{selectedNode.type}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="p-2 text-gray-500 hover:text-gray-700">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <button
+                onClick={() => setSelectedNode(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-2">Connections</h4>
-                <div className="space-y-2">
-                  {edges.filter(e => e.source === selectedNode.id || e.target === selectedNode.id).map((edge, idx) => {
+            {/* Connections list */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="font-medium text-gray-900 text-sm mb-3">
+                Connections ({edges.filter((e) => e.source === selectedNode.id || e.target === selectedNode.id).length})
+              </h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-thin">
+                {edges
+                  .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
+                  .map((edge, idx) => {
                     const otherId = edge.source === selectedNode.id ? edge.target : edge.source;
-                    const otherNode = nodes.find(n => n.id === otherId);
+                    const otherNode = nodes.find((n) => n.id === otherId);
+                    const OtherIcon = NODE_ICONS[otherNode?.type || 'case'] || Target;
                     return (
-                      <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: otherNode?.color || '#6B7280' }}>
-                            {otherNode?.label.charAt(0) || '?'}
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                            style={{ backgroundColor: otherNode?.color || '#6B7280' }}
+                          >
+                            <OtherIcon className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-sm text-gray-700">{otherNode?.label || otherId}</span>
+                          <span className="text-sm text-gray-700 truncate max-w-[180px]">
+                            {otherNode?.label || otherId}
+                          </span>
                         </div>
-                        <span className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">{edge.label}</span>
+                        <span className="text-xs text-gray-500 px-2 py-1 bg-gray-50 rounded-md font-medium flex-shrink-0">
+                          {edge.label}
+                        </span>
                       </div>
                     );
                   })}
-                </div>
               </div>
-
-              <button className="btn-primary w-full" onClick={() => setSelectedNode(null)}>
-                Close
-              </button>
             </div>
+
+            <button
+              className="btn-primary w-full mt-4"
+              onClick={() => setSelectedNode(null)}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
@@ -509,8 +820,12 @@ export function EntityGraphPage() {
   );
 }
 
-function formatStatus(status: string): string {
-  return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function fmtStatus(status: string): string {
+  return status.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
 
 function getStatusBadgeColor(status: string): string {
@@ -525,4 +840,18 @@ function getStatusBadgeColor(status: string): string {
     CLOSED: 'badge-gray',
   };
   return colors[status] || 'badge-gray';
+}
+
+function GraphStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="card p-4 flex items-center justify-between">
+      <div>
+        <p className="text-sm text-gray-500">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      </div>
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tone}`}>
+        <Target className="w-4 h-4" />
+      </div>
+    </div>
+  );
 }

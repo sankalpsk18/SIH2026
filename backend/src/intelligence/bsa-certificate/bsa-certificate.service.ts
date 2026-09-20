@@ -13,6 +13,7 @@ import { getBlockchainService } from '../../blockchain/blockchain.service.js';
 import { getDocumentIngestionService } from '../../document-ingestion/ingestion.service.js';
 import { getStorageService } from '../../storage/storage.service.js';
 import { CustodyAction } from '../../types/database.js';
+import { config } from '../../config/index.js';
 import {
     BSA63Certificate,
     BSA63CertificateContent,
@@ -105,10 +106,44 @@ export class BsaCertificateService {
                 custodyLedgerTxIds: custodyChain.map(c => c.tx_id),
                 chainOfCustodyHash: this.computeChainOfCustodyHash(custodyChain),
                 certificateContent,
-                digitalSignatureId: undefined, // Will be set after signing
+                digitalSignatureId: undefined,
                 qrCodeHash,
                 qrCodeImageUrl,
             };
+
+            if (!config.isProduction) {
+                const signatureId = uuidv4();
+                const signatureValue = crypto
+                    .createHash('sha256')
+                    .update(`${certificateId}:${fileHash}:${issuedByUserId}`)
+                    .digest();
+
+                await client.query(
+                    `INSERT INTO digital_signatures (
+                        id, signature_id, signer_user_id, signer_node_id, signature_type,
+                        certificate_pem, certificate_serial, certificate_issuer,
+                        certificate_valid_from, certificate_valid_to, signed_data_hash,
+                        signed_data_type, signed_data_id, signature_algorithm, signature_value,
+                        signature_timestamp, is_verified, verified_at, verified_by, metadata
+                    ) VALUES ($1,$2,$3,'court-node-1','DIGITAL_SIGNATURE',$4,$5,$6,$7,$8,$9,'BSA_CERTIFICATE',$10,'SHA256-SIMULATED',$11,$12,TRUE,$12,$3,$13)`,
+                    [
+                        signatureId,
+                        `DEV-SIG-${certificateId}`,
+                        issuedByUserId,
+                        'ADALAT360 Development Certificate Authority',
+                        certificateId,
+                        'ADALAT360-DEV-CA',
+                        now,
+                        validUntil,
+                        fileHash,
+                        certificateId,
+                        signatureValue,
+                        now,
+                        JSON.stringify({ simulated: true, reason: 'development_environment' }),
+                    ]
+                );
+                certificate.digitalSignatureId = signatureId;
+            }
 
             // Store certificate in database
             await client.query(
@@ -117,8 +152,8 @@ export class BsaCertificateService {
                     certificate_type, issued_by, issued_at, valid_from, valid_until, status,
                     hash_algorithm, file_hash, file_size_bytes, metadata_hash,
                     custody_ledger_tx_ids, chain_of_custody_hash, certificate_content,
-                    qr_code_hash, qr_code_image_path, created_at, updated_at
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW(),NOW())`,
+                    digital_signature_id, qr_code_hash, qr_code_image_path, created_at, updated_at
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW(),NOW())`,
                 [
                     certificateId,
                     certificateNumber,
@@ -139,6 +174,7 @@ export class BsaCertificateService {
                     certificate.custodyLedgerTxIds,
                     certificate.chainOfCustodyHash,
                     JSON.stringify(certificate.certificateContent),
+                    certificate.digitalSignatureId,
                     certificate.qrCodeHash,
                     qrCodeImageUrl, // Store as data URL for now
                 ]
@@ -165,7 +201,7 @@ export class BsaCertificateService {
             return {
                 certificate,
                 pdfUrl,
-                verificationUrl: `${config.server.corsOrigin}/verify/${certificateNumber}`,
+                verificationUrl: `${config.server.corsOrigin}/verify?certificateNumber=${encodeURIComponent(certificateNumber)}`,
             };
         });
     }
@@ -457,14 +493,8 @@ export class BsaCertificateService {
     }
 
     private buildQrCodeData(certificateNumber: string, fileHash: string, caseId: string): string {
-        return JSON.stringify({
-            v: 1,
-            type: 'BSA_63_CERT',
-            cert: certificateNumber,
-            hash: fileHash.substring(0, 16),
-            case: caseId.substring(0, 8),
-            verify: `${config.server.corsOrigin}/verify/${certificateNumber}`,
-        });
+        // Encode a normal URL so phone cameras open the certificate page directly.
+        return `${config.server.corsOrigin}/verify?certificateNumber=${encodeURIComponent(certificateNumber)}`;
     }
 
     private async generateCertificateNumber(caseId: string, client: any): Promise<string> {

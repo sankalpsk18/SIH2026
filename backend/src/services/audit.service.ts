@@ -470,6 +470,30 @@ export async function cleanupOldAuditLogs(retentionDays: number = 2555): Promise
 }
 
 // ============================================================================
+// SINGLETON INSTANCE
+// ============================================================================
+
+let auditServiceInstance: typeof import('./audit.service.js') | null = null;
+
+export function getAuditService() {
+    // Return the service object with all functions as methods
+    return {
+        logAuthEvent,
+        logAuditEvent,
+        queryAuditLogs,
+        getAuditLogById,
+        getUserAuditTrail,
+        getResourceAuditTrail,
+        generateComplianceReport,
+        getRtiAuditTrail,
+        logBlockchainEvent,
+        logAnomalyDetected,
+        cleanupOldAuditLogs,
+        exportAuditLogs,
+    };
+}
+
+// ============================================================================
 // EXPORT FOR EXTERNAL AUDITORS
 // ============================================================================
 

@@ -453,6 +453,55 @@ router.patch('/:evidenceId',
 );
 
 // ============================================================================
+// SOFT DELETE EVIDENCE
+// ============================================================================
+
+router.delete('/:evidenceId',
+    validate(evidenceIdParamSchema),
+    async (req, res, next) => {
+        try {
+            const { evidenceId } = req.params;
+            const eviResult = await pgQuery(
+                `SELECT case_id FROM evidence WHERE id = $1 AND deleted_at IS NULL`,
+                [evidenceId]
+            );
+
+            if (eviResult.rows.length === 0) {
+                res.status(404).json({ error: 'NOT_FOUND', message: 'Evidence not found' });
+                return;
+            }
+
+            if (req.auth!.role !== 'CENTRAL_ADMIN' && req.auth!.role !== 'AUDITOR' && !req.auth!.case_ids.includes(eviResult.rows[0].case_id)) {
+                res.status(403).json({ error: 'FORBIDDEN', message: 'Access denied' });
+                return;
+            }
+
+            await pgQuery(
+                `UPDATE evidence SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL`,
+                [evidenceId]
+            );
+
+            await logAuditEvent({
+                event_type: 'EVIDENCE_DELETED',
+                event_category: 'EVIDENCE_MANAGEMENT',
+                user_id: req.auth!.sub,
+                user_role: req.auth!.role,
+                user_ip: req.ip,
+                action: 'delete_evidence',
+                outcome: 'SUCCESS',
+                resource_type: 'EVIDENCE',
+                resource_id: evidenceId,
+                request_id: req.headers['x-request-id'] as string,
+            });
+
+            res.status(204).send();
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// ============================================================================
 // CUSTODY TRANSFER (Handover)
 // ============================================================================
 

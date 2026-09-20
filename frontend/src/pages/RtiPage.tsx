@@ -1,44 +1,17 @@
-﻿import React from 'react';
-import { Mail, Plus, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, Mail, Plus, Search } from 'lucide-react';
+
+const samples = [
+  { number: 'RTI/2026/0041', applicant: 'Meera Nair', subject: 'CCTV footage retention policy', status: 'Under Process', caseRef: 'CR-2026-0417', due: '12 Sep 2026' },
+  { number: 'RTI/2026/0038', applicant: 'Arjun Rao', subject: 'Status of seized digital exhibits', status: 'Received', caseRef: 'CR-2026-0388', due: '18 Sep 2026' },
+  { number: 'RTI/2026/0029', applicant: 'Kavita Shah', subject: 'Certified copy of investigation record', status: 'Response Ready', caseRef: 'CR-2026-0431', due: 'Closed' },
+];
 
 export function RtiPage() {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">RTI Requests</h1>
-          <p className="text-gray-600 mt-1">Manage Right to Information requests</p>
-        </div>
-        <button className="btn-primary"><Plus className="w-4 h-4 mr-2" />New RTI Request</button>
-      </div>
-
-      <div className="card p-4">
-        <form className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3">
-            <label className="label">Search</label>
-            <div className="relative mt-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search by request number or applicant" className="input pl-10" />
-            </div>
-          </div>
-          <div>
-            <label className="label">Status</label>
-            <select className="input"><option value="">All Statuses</option><option>Received</option><option>Under Process</option></select>
-          </div>
-          <div>
-            <label className="label">Action</label>
-            <button type="submit" className="btn-primary w-full">Filter</button>
-          </div>
-        </form>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="p-12 text-center text-gray-500">
-          <Mail className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">No RTI requests found</p>
-          <p className="text-sm text-gray-400 mt-1">Submit your first RTI request</p>
-        </div>
-      </div>
-    </div>
-  );
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const requests = samples.filter(request => (!status || request.status === status) && `${request.number} ${request.applicant} ${request.subject}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="space-y-6"><div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-wider text-primary-600">Information desk</p><h1 className="text-2xl font-bold text-gray-900">RTI Requests</h1><p className="text-gray-600 mt-1">Track public information requests against permitted case records.</p></div><button className="btn-primary"><Plus className="w-4 h-4" /> New RTI request</button></div><div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><Summary label="Open requests" value={2} /><Summary label="Due this week" value={1} /><Summary label="Response ready" value={1} /></div><div className="card p-4"><div className="grid grid-cols-1 sm:grid-cols-3 gap-4"><div className="sm:col-span-2 relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input value={query} onChange={event => setQuery(event.target.value)} className="input pl-10" placeholder="Search request number, applicant, or subject" /></div><select value={status} onChange={event => setStatus(event.target.value)} className="input"><option value="">All statuses</option><option>Received</option><option>Under Process</option><option>Response Ready</option></select></div></div><div className="grid grid-cols-1 lg:grid-cols-3 gap-4">{requests.map(request => <div key={request.number} className="card-hover p-5 border-l-4 border-primary-500"><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-xs font-bold text-primary-700">{request.number}</p><p className="font-semibold text-gray-900 mt-2">{request.subject}</p></div><span className={`badge ${request.status === 'Response Ready' ? 'badge-green' : request.status === 'Under Process' ? 'badge-yellow' : 'badge-blue'}`}>{request.status}</span></div><div className="mt-5 space-y-2 text-sm"><p><span className="text-gray-500">Applicant:</span> <span className="font-medium">{request.applicant}</span></p><p><span className="text-gray-500">Case:</span> <span className="font-mono text-xs">{request.caseRef}</span></p><p><span className="text-gray-500">Deadline:</span> <span className="font-medium">{request.due}</span></p></div><button className="btn-secondary btn-sm mt-5"><FileText className="w-4 h-4" /> Open request</button></div>)}</div>{requests.length === 0 && <div className="card p-12 text-center text-gray-500"><Mail className="w-12 h-12 text-gray-300 mx-auto mb-3" /><p>No RTI requests match the current filters.</p></div>}</div>;
 }
+
+function Summary({ label, value }: { label: string; value: number }) { return <div className="card p-4"><p className="text-sm text-gray-500">{label}</p><p className="text-2xl font-bold text-gray-900 mt-1">{value}</p></div>; }

@@ -41,7 +41,7 @@ const navigation = [
   { name: 'Evidence', href: '/evidence', icon: ShieldCheck, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
   { name: 'Timeline', href: '/timeline', icon: History, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
   { name: 'Entity Graph', href: '/entity-graph', icon: GitBranch, roles: ['INVESTIGATING_OFFICER', 'FORENSIC_LAB', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
-  { name: 'BSA Certificates', href: '/bsa', icon: FileSignature, roles: ['PROSECUTOR', 'COURT', 'CENTRAL_ADMIN'] },
+  { name: 'BSA Certificates', href: '/bsa', icon: FileSignature, roles: ['CENTRAL_ADMIN'] },
   { name: 'RTI Requests', href: '/rti', icon: ClipboardList, roles: ['INVESTIGATING_OFFICER', 'PROSECUTOR', 'COURT', 'CENTRAL_ADMIN', 'AUDITOR'] },
 ];
 
@@ -57,6 +57,7 @@ export function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const userRole = user?.role ?? 'INVESTIGATING_OFFICER';
 
@@ -197,10 +198,39 @@ export function Layout() {
             {/* Right side */}
             <div className="flex items-center gap-4">
               {/* Notifications */}
-              <button className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
+              <div className="relative">
+              <button
+                className="relative p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                aria-label="Open notifications"
+                aria-expanded={notificationsOpen}
+              >
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-4 h-4 bg-danger-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
               </button>
+              {notificationsOpen && (
+                <div className="dropdown-menu right-0 w-80">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                    <button className="text-xs text-primary-600 hover:text-primary-700" onClick={() => setNotificationsOpen(false)}>Mark all read</button>
+                  </div>
+                  <div className="py-1">
+                    <div className="dropdown-item items-start gap-3">
+                      <span className="mt-1.5 w-2 h-2 rounded-full bg-warning-500 shrink-0" />
+                      <span><strong className="font-medium text-gray-900">Case review due</strong><span className="block text-xs text-gray-500 mt-0.5">ADL-2026-104 needs attention today.</span></span>
+                    </div>
+                    <div className="dropdown-item items-start gap-3">
+                      <span className="mt-1.5 w-2 h-2 rounded-full bg-success-500 shrink-0" />
+                      <span><strong className="font-medium text-gray-900">Evidence chain verified</strong><span className="block text-xs text-gray-500 mt-0.5">Blockchain verification completed.</span></span>
+                    </div>
+                    <div className="dropdown-item items-start gap-3">
+                      <span className="mt-1.5 w-2 h-2 rounded-full bg-primary-500 shrink-0" />
+                      <span><strong className="font-medium text-gray-900">New assignment</strong><span className="block text-xs text-gray-500 mt-0.5">You were added to a case workspace.</span></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              </div>
 
               {/* User menu */}
               <div className="relative">

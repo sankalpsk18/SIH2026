@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,8 +24,8 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react';
-import { documentsApi } from '../services/api';
-import { Document, DocumentType, DocumentStatus } from '../types';
+import { casesApi, documentsApi } from '../services/api';
+import { Case, Document, DocumentType, DocumentStatus } from '../types';
 import { toast } from 'react-hot-toast';
 
 const documentTypes: DocumentType[] = ['FIR', 'INVESTIGATION_RECORD', 'WITNESS_STATEMENT', 'CHARGE_SHEET', 'COURT_FILING', 'EVIDENCE_RECORD', 'FORENSIC_REPORT', 'LEGAL_NOTICE', 'JUDGMENT', 'ORDER', 'SUMMONS', 'WARRANT', 'BAIL_APPLICATION', 'AFFIDAVIT', 'EXHIBIT_LIST', 'SEIZURE_MEMO', 'PANCHNAMA', 'CASE_DIARY', 'OTHER'];
@@ -45,6 +45,7 @@ const filterSchema = z.object({
 type FilterFormData = z.infer<typeof filterSchema>;
 
 export function DocumentsPage() {
+  const { caseId: routeCaseId } = useParams<{ caseId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [total, setTotal] = useState(0);
@@ -53,7 +54,9 @@ export function DocumentsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [selectedCaseId, setSelectedCaseId] = useState<string>(routeCaseId || '');
+  const [cases, setCases] = useState<Case[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const {
     register,
@@ -72,8 +75,21 @@ export function DocumentsPage() {
   const caseId = watch('caseId');
 
   useEffect(() => {
+    casesApi.list({ limit: 100, sort_by: 'created_at', sort_order: 'desc' })
+      .then(response => setCases(response.data.cases || []))
+      .catch(() => toast.error('Could not load cases for the document filter'));
+  }, []);
+
+  useEffect(() => {
+    if (routeCaseId) {
+      setSelectedCaseId(routeCaseId);
+      setValue('caseId', routeCaseId);
+    }
+  }, [routeCaseId, setValue]);
+
+  useEffect(() => {
     loadDocuments();
-  }, [page, limit, caseId]);
+  }, [page, limit, selectedCaseId]);
 
   const loadDocuments = async () => {
     if (!selectedCaseId) {
@@ -171,7 +187,9 @@ export function DocumentsPage() {
             <label className="label">Case</label>
             <select {...register('caseId')} className="input">
               <option value="">All Cases</option>
-              {/* In production, fetch user's cases */}
+              {cases.map(caseItem => (
+                <option key={caseItem.id} value={caseItem.id}>{caseItem.case_number} · {caseItem.title}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -270,10 +288,15 @@ export function DocumentsPage() {
                               <Clock className="w-4 h-4" />
                             </Link>
                             <div className="relative">
-                              <button className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg">
+                              <button
+                                className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg"
+                                onClick={() => setOpenMenuId(openMenuId === doc.id ? null : doc.id)}
+                                aria-label={`More actions for ${doc.document_number}`}
+                                aria-expanded={openMenuId === doc.id}
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </button>
-                              <div className="dropdown-menu">
+                              {openMenuId === doc.id && <div className="dropdown-menu">
                                 <Link to={`/documents/${doc.id}`} className="dropdown-item">
                                   <Eye className="w-4 h-4" />
                                   View Details
@@ -287,7 +310,7 @@ export function DocumentsPage() {
                                   <Trash2 className="w-4 h-4" />
                                   Delete
                                 </button>
-                              </div>
+                              </div>}
                             </div>
                           </div>
                         </td>

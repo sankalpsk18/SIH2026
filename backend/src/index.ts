@@ -72,7 +72,9 @@ const globalLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => req.ip || 'unknown',
-    skip: (req) => req.path === '/api/v1/auth/health',
+    // Development uses hot reload and repeated API navigation; keep throttling
+    // enabled for production traffic while avoiding false positives locally.
+    skip: (req) => config.isDevelopment || req.path === '/api/v1/auth/health',
 });
 app.use(globalLimiter);
 

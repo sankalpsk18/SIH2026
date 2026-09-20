@@ -104,11 +104,9 @@ export class EntityGraphService {
         if (!include) return [];
 
         const result = await pgQuery(
-            `SELECT e.id, e.name, e.evidence_number, em.extracted_entities
+            `SELECT e.id, e.name, e.evidence_number
              FROM evidence e
-             LEFT JOIN evidence_metadata em ON em.evidence_id = e.id
-             WHERE e.case_id = $1 AND e.deleted_at IS NULL
-             AND em.extracted_entities IS NOT NULL`,
+             WHERE e.case_id = $1 AND e.deleted_at IS NULL`,
             [caseId]
         );
 
@@ -116,7 +114,7 @@ export class EntityGraphService {
             id: row.id,
             name: row.name,
             evidenceNumber: row.evidence_number,
-            entities: row.extracted_entities || {},
+            entities: {}, // extracted_entities not available for evidence in current schema
         }));
     }
 

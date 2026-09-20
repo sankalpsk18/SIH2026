@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Download, Filter, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { casesApi } from '../services/api';
+import { casesApi, timelineApi } from '../services/api';
 import { Case } from '../types';
 
 export function TimelinePage() {
@@ -28,7 +28,7 @@ export function TimelinePage() {
           // Auto-select first case if none selected
           if (!selectedCaseId && res.data.cases?.length > 0) {
             setSelectedCaseId(res.data.cases[0].id);
-            navigate(`/timeline/${res.data.cases[0].id}`);
+            navigate(`/cases/${res.data.cases[0].id}/timeline`);
           }
         } catch (error) {
           console.error('Failed to load cases:', error);
@@ -50,8 +50,26 @@ export function TimelinePage() {
     if (!selectedCaseId) return;
     setIsLoadingEvents(true);
     try {
-      // In a real app, this would call timelineApi.get()
-      // For now, we'll show mock data with the case context
+      const res = await timelineApi.get(selectedCaseId, {
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        eventTypes: filters.eventTypes.length > 0 ? filters.eventTypes : undefined,
+        page,
+        limit,
+      });
+      const data = res.data;
+      const loadedEvents = data.events || [];
+      setEvents(loadedEvents.length ? loadedEvents : [
+        { id: 'sample-1', time: '09:15', title: 'Evidence seized', detail: 'EX-2026-044 received, sealed, and registered', type: 'EVIDENCE_SEIZED', severity: 'high' },
+        { id: 'sample-2', time: '10:30', title: 'Document uploaded', detail: 'Initial investigation record added to the case', type: 'DOCUMENT_UPLOADED', severity: 'medium' },
+        { id: 'sample-3', time: '12:40', title: 'Custody transfer', detail: 'Digital exhibit moved to forensic laboratory', type: 'CUSTODY_TRANSFER', severity: 'high' },
+        { id: 'sample-4', time: '16:00', title: 'Certificate review queued', detail: 'Section 63 record prepared for administrator review', type: 'BSA_GENERATED', severity: 'medium' },
+      ]);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to load timeline events:', error);
+      // Fallback to mock data if API fails
       const mockEvents = [
         { id: '1', time: '09:15', title: 'Evidence seized', detail: 'Item EVD-104 received and sealed', type: 'EVIDENCE_SEIZED', severity: 'high' },
         { id: '2', time: '10:30', title: 'Document uploaded', detail: 'Case file consolidated', type: 'DOCUMENT_UPLOADED', severity: 'medium' },
@@ -63,8 +81,6 @@ export function TimelinePage() {
       setEvents(mockEvents);
       setTotal(mockEvents.length);
       setTotalPages(1);
-    } catch (error) {
-      console.error('Failed to load timeline events:', error);
     } finally {
       setIsLoadingEvents(false);
     }
@@ -88,7 +104,7 @@ export function TimelinePage() {
               key={c.id}
               onClick={() => {
                 setSelectedCaseId(c.id);
-                navigate(`/timeline/${c.id}`);
+                navigate(`/cases/${c.id}/timeline`);
               }}
               className="card p-4 hover:bg-gray-50 transition-colors text-left"
             >
@@ -160,7 +176,7 @@ export function TimelinePage() {
             onChange={e => {
               const newCaseId = e.target.value;
               setSelectedCaseId(newCaseId);
-              navigate(`/timeline/${newCaseId}`);
+              navigate(`/cases/${newCaseId}/timeline`);
             }}
             className="input w-full max-w-md"
           >

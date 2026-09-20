@@ -42,6 +42,13 @@ export function LoginPage() {
   });
 
   const email = watch('email');
+  const demoAccounts = [
+    { label: 'Admin', email: 'admin@adalat360.gov.in' },
+    { label: 'Officer', email: 'officer.sharma@adalat360.gov.in' },
+    { label: 'Forensic', email: 'lab.director@adalat360.gov.in' },
+    { label: 'Prosecutor', email: 'prosecutor.singh@adalat360.gov.in' },
+    { label: 'Court', email: 'judge.kumar@adalat360.gov.in' },
+  ];
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -213,13 +220,18 @@ export function LoginPage() {
 
           {/* Demo credentials */}
           <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-500 text-center mb-2">Demo Credentials (Password: Test@123)</p>
-            <div className="space-y-1 text-xs text-gray-600">
-              <p><strong>Admin:</strong> admin@adalat360.gov.in</p>
-              <p><strong>Officer:</strong> officer.sharma@adalat360.gov.in</p>
-              <p><strong>Forensic:</strong> lab.director@adalat360.gov.in</p>
-              <p><strong>Prosecutor:</strong> prosecutor.singh@adalat360.gov.in</p>
-              <p><strong>Court:</strong> judge.kumar@adalat360.gov.in</p>
+            <p className="text-xs text-gray-500 text-center mb-3">Demo accounts use password <strong>Test@123</strong></p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {demoAccounts.map(account => (
+                <button
+                  key={account.email}
+                  type="button"
+                  onClick={() => { setValue('email', account.email); setValue('password', 'Test@123'); }}
+                  className="px-2.5 py-1.5 text-xs font-medium text-primary-700 bg-white border border-primary-200 rounded-md hover:bg-primary-50"
+                >
+                  {account.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

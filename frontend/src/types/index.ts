@@ -259,6 +259,7 @@ export interface Evidence {
   sent_for_analysis_at?: string;
   analysis_completed_at?: string;
   court_exhibit_number?: string;
+  photographs?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -372,26 +373,27 @@ export interface Block {
 // BSA Certificate
 export interface BSA63Certificate {
   id: string;
-  certificate_number: string;
-  case_id: string;
-  document_id: string;
+  certificateNumber: string;
+  caseId: string;
+  documentId: string;
   section: string;
-  certificate_type: string;
-  issued_by: string;
-  issued_at: string;
-  valid_from: string;
-  valid_until?: string;
+  subsection?: string;
+  certificateType: string;
+  issuedBy: string;
+  issuedAt: string;
+  validFrom: string;
+  validUntil?: string;
   status: string;
-  hash_algorithm: string;
-  file_hash: string;
-  file_size_bytes: number;
-  metadata_hash: string;
-  custody_ledger_tx_ids: string[];
-  chain_of_custody_hash: string;
-  certificate_content: BSA63CertificateContent;
-  digital_signature_id?: string;
-  qr_code_hash: string;
-  qr_code_image_url?: string;
+  hashAlgorithm: string;
+  fileHash: string;
+  fileSizeBytes: number;
+  metadataHash: string;
+  custodyLedgerTxIds: string[];
+  chainOfCustodyHash: string;
+  certificateContent: BSA63CertificateContent;
+  digitalSignatureId?: string;
+  qrCodeHash: string;
+  qrCodeImageUrl?: string;
 }
 
 export interface BSA63CertificateContent {

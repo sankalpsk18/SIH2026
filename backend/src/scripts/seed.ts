@@ -340,6 +340,93 @@ async function seedDatabase(): Promise<void> {
         }
 
         // ============================================================
+        // SEED DOCUMENTS
+        // ============================================================
+        console.log('Seeding case documents...');
+
+        const seededDocuments = [
+            {
+                caseId: case1Id,
+                number: 'DOC/2024/DEL/001',
+                title: 'Initial cyber fraud complaint and FIR',
+                description: 'Digitized FIR and initial complaint submitted by the affected account holders.',
+                type: 'FIR',
+                filename: 'fir-cyber-fraud-001.pdf',
+                size: 2483200,
+                hash: crypto.createHash('sha256').update('adalat360-demo-fir-cyber-fraud-001').digest('hex'),
+                tags: ['fir', 'cyber-fraud', 'priority-high'],
+                uploadedBy: ioId,
+            },
+            {
+                caseId: case1Id,
+                number: 'DOC/2024/DEL/002',
+                title: 'Bank transaction analysis report',
+                description: 'Forensic review of beneficiary accounts, transaction timestamps, and linked wallet addresses.',
+                type: 'FORENSIC_REPORT',
+                filename: 'transaction-analysis-report.pdf',
+                size: 5849120,
+                hash: crypto.createHash('sha256').update('adalat360-demo-transaction-analysis-002').digest('hex'),
+                tags: ['forensic', 'financial-records', 'analysis'],
+                uploadedBy: flId,
+            },
+            {
+                caseId: case2Id,
+                number: 'DOC/2024/MUM/001',
+                title: 'Post-mortem and scene examination report',
+                description: 'Certified examination report associated with the incident scene and recovered material.',
+                type: 'FORENSIC_REPORT',
+                filename: 'scene-examination-report.pdf',
+                size: 3921840,
+                hash: crypto.createHash('sha256').update('adalat360-demo-scene-examination-001').digest('hex'),
+                tags: ['forensic', 'scene', 'exhibit-a'],
+                uploadedBy: flId,
+            },
+            {
+                caseId: case2Id,
+                number: 'DOC/2024/MUM/002',
+                title: 'Witness statement - R. Mehta',
+                description: 'Signed witness statement recorded during the investigation.',
+                type: 'WITNESS_STATEMENT',
+                filename: 'witness-statement-r-mehta.pdf',
+                size: 1189040,
+                hash: crypto.createHash('sha256').update('adalat360-demo-witness-statement-002').digest('hex'),
+                tags: ['witness', 'statement', 'signed'],
+                uploadedBy: io2Id,
+            },
+        ];
+
+        for (const document of seededDocuments) {
+            const documentId = uuidv4();
+            await client.query(
+                `INSERT INTO documents (
+                    id, case_id, document_number, title, description, document_type, status,
+                    version, is_latest_version, original_filename, stored_filename, mime_type,
+                    file_size_bytes, file_hash_sha256, storage_path, storage_bucket,
+                    ocr_text, ocr_language, ocr_confidence, ocr_processed_at, metadata,
+                    extracted_entities, tags, uploaded_by, created_at, updated_at
+                ) VALUES ($1,$2,$3,$4,$5,$6,'VERIFIED',1,TRUE,$7,$7,'application/pdf',$8,$9,$10,'adalat360-demo',
+                    $11,'eng',96.50,NOW(),'{}','{}',$12,$13,NOW(),NOW())
+                ON CONFLICT (document_number) DO NOTHING`,
+                [
+                    documentId,
+                    document.caseId,
+                    document.number,
+                    document.title,
+                    document.description,
+                    document.type,
+                    document.filename,
+                    document.size,
+                    document.hash,
+                    `demo/${document.caseId}/${document.filename}`,
+                    `Demo OCR text for ${document.title}. This seeded record is available for search and BSA certificate testing.`,
+                    document.tags,
+                    document.uploadedBy,
+                ]
+            );
+        }
+        console.log('  ✓ Case documents seeded');
+
+        // ============================================================
         // SEED SYSTEM CONFIG
         // ============================================================
         console.log('Seeding system config...');
