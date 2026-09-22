@@ -301,7 +301,7 @@ export function AuditPage() {
             <Loader2 className="w-10 h-10 animate-spin text-primary-600" />
           </div>
         ) : (
-          <div>
+          <>
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
@@ -392,12 +392,9 @@ export function AuditPage() {
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
-  </>
-)}
-    </div>
   );
 }
 

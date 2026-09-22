@@ -29,7 +29,8 @@
       "@document-ingestion/*": ["document-ingestion/*"],
       "@storage/*": ["storage/*"],
       "@intelligence/*": ["intelligence/*"],
-      "@api/*": ["api/*"]
+      "@api/*": ["api/*"],
+      "@types/*": ["types/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "types": ["node", "jest"],
